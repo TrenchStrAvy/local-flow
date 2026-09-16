@@ -1,43 +1,48 @@
 # local-flow
 
-**Free, fully offline, multilingual dictation for macOS.**
+**Free, private, multilingual dictation for macOS.** Hold a key, speak,
+release. Your words appear in the text field you were typing in.
 
-Hold **Right-Option**, speak, release. Your words are transcribed on your
-own CPU and pasted into whatever text field you were in. No account, no API
-key, no credits, no network: nothing you say leaves your machine.
+Everything runs on your Mac. No account, no API key, no credits, no cloud:
+nothing you say ever leaves the machine.
 
 ```
 Hold Right-Option → mic capture
-    → faster-whisper (speech-to-text, local CPU, 99 languages)
-    → Ollama gemma3:4b (optional cleanup: punctuation, filler words, local)
+    → faster-whisper (speech-to-text on your CPU, 99 languages)
+    → Ollama gemma3:4b (optional local cleanup: punctuation, filler words)
     → pasted into the text field you started in
 ```
 
-## Features
+## Key features
 
-- **Offline speech-to-text** with [faster-whisper](https://github.com/SYSTRAN/faster-whisper).
-  Runs on the CPU (int8), so it works on Intel Macs, not only Apple Silicon.
-- **99 languages.** English, German, French, Spanish, … the whole Whisper
-  catalog. Pick the ones you use from the menu bar; one multilingual model
-  covers them all, so there is nothing extra to download per language.
-- **Quick keys while dictating.** Hold Right-Option and tap **Q**, **W**, or
-  **E** (also R and T) to switch language mid-sentence. The letters are
-  assignable in the menu; the keystroke never reaches your document.
-- **Pastes into the field you started in.** If you click somewhere else while
-  speaking or while transcription is running, local-flow re-focuses the
-  original text field before pasting (via the Accessibility API).
-- **Optional local cleanup** with Ollama: fixes punctuation and
-  capitalization, drops "um / äh / euh", never translates, and is time-boxed
-  so a slow model can never eat your words.
-- **Menu-bar app** with language picker, quick-key configuration, add or
-  remove languages, and a floating waveform that ripples with your voice.
-- **Starts at login** as a LaunchAgent, with a startup splash that shows the
-  model loading and fades away when the hotkey is live.
+- **100% offline.** Speech-to-text runs locally with
+  [faster-whisper](https://github.com/SYSTRAN/faster-whisper). The optional
+  cleanup pass runs on a local Ollama model. There is no server, no
+  telemetry, and nothing to pay for.
+- **99 languages.** English, Deutsch, Français, Español, 日本語, العربية and
+  every other language Whisper knows. One multilingual model covers them
+  all, so adding a language is a menu click, not a download.
+- **Fast keys: switch language without stopping.** While holding
+  Right-Option, tap **Q** for German, **W** for French, **E** for English
+  (defaults). Assign Q, W, E, R, and T to any languages you like from the
+  menu bar. The letter never reaches your document; the current sentence
+  is transcribed in the new language.
+- **Text lands where you started.** If you click somewhere else while
+  speaking or while transcription is running, local-flow brings the
+  original app and text field back into focus before pasting.
+- **Optional local cleanup.** Fixes punctuation and capitalization and
+  removes "um", "äh", "euh". It never translates, and it is time-boxed so
+  a slow model can never eat your words.
+- **Works on Intel Macs.** Uses the int8 CPU path, not Apple-Silicon-only
+  frameworks. A 6-second dictation lands in about 2 seconds on an i9.
+- **Native feel.** A mic icon in the menu bar, a floating waveform that
+  ripples with your voice, a startup splash while the model loads, a
+  LocalFlow icon in Launchpad, and a service that starts at login.
 - **Clipboard-safe.** Whatever you had copied is restored after the paste.
 
 ## Install
 
-Requires macOS 13+ and Python 3.10+.
+macOS 13 or later, Python 3.10 or later. One command after cloning:
 
 ```bash
 git clone https://github.com/TrenchStrAvy/local-flow.git
@@ -45,34 +50,30 @@ cd local-flow
 ./install.sh
 ```
 
-Useful flags:
+The installer creates a virtual environment, installs dependencies,
+downloads the speech model, builds a named **LocalFlow** runtime app (so
+macOS privacy settings show "LocalFlow" instead of "Python"), places a
+**LocalFlow** launcher in `/Applications` and Launchpad, and installs a
+login service. Re-running it is safe.
 
-| Flag             | Effect                                                         |
-|------------------|----------------------------------------------------------------|
-| `--multilingual` | pre-download the multilingual model too (~460 MB)               |
-| `--with-cleanup` | install Ollama + gemma3:4b via Homebrew and enable cleanup      |
-| `--no-service`   | set up the venv and models only; run `flow.py` yourself         |
-| `--model NAME`   | pre-download a different whisper model (`tiny.en`, `medium.en`) |
+| Flag             | Effect                                                            |
+|------------------|-------------------------------------------------------------------|
+| `--with-cleanup` | install Ollama and gemma3:4b via Homebrew and enable the cleanup pass |
+| `--multilingual` | pre-download the multilingual model now (~460 MB) instead of on first switch |
+| `--model NAME`   | pre-download a different Whisper model (`tiny.en`, `medium.en`)    |
+| `--no-service`   | set up the environment only; run `flow.py` from a terminal yourself |
 
-The installer creates `.venv`, installs dependencies, downloads the speech
-model, and installs a LaunchAgent that starts local-flow at login. Your
-Homebrew, Python, and Ollama installs are otherwise untouched.
+### Permissions (once)
 
-### Permissions (one time)
+macOS will not let any program listen for a global hotkey or paste into
+other apps without these. In **System Settings → Privacy & Security**,
+grant them to **LocalFlow**:
 
-macOS will not let a program listen to a global hotkey or paste into other
-apps without these. Grant them to **Python** (the `.venv/bin/python` the
-service runs) in **System Settings → Privacy & Security**:
-
-1. **Microphone**: prompted automatically on the first recording.
+1. **Microphone**: macOS asks automatically on the first recording.
 2. **Accessibility**: needed to paste and to re-focus the original field.
-3. **Input Monitoring**: needed for the global hotkey and quick keys.
+3. **Input Monitoring**: needed for the hotkey and the fast keys.
 
-Then restart the service:
-
-```bash
-launchctl kickstart -k gui/$(id -u)/com.localflow.dictation
-```
+Then click **LocalFlow** in Launchpad (or restart the service, below).
 
 ## Use
 
@@ -83,26 +84,26 @@ cursor was when you pressed the key.
 
 Click the **mic icon** in the menu bar for everything else:
 
-| Menu item           | What it does                                                    |
-|---------------------|-----------------------------------------------------------------|
-| **Language ▸**      | switch between your enabled languages (shows each quick key)    |
-| **Quick keys ▸**    | assign Q / W / E / R / T to any enabled language, or clear them |
-| **Add language ▸**  | browse the full catalog (grouped A–Z) and add one to the menu   |
-| **Remove language ▸** | take one out of the menu (and off its quick key)              |
-| **Quit local-flow** | stop the service until you start it again                       |
+| Menu item             | What it does                                                    |
+|-----------------------|-----------------------------------------------------------------|
+| **Language ▸**        | switch between your enabled languages; each shows its fast key   |
+| **Quick keys ▸**      | assign Q / W / E / R / T to any enabled language, or clear them |
+| **Add language ▸**    | browse the full catalog (grouped A–Z) and add one to the menu   |
+| **Remove language ▸** | take one out of the menu and off its fast key                   |
+| **Quit local-flow**   | stop the service until you start it again from Launchpad        |
 
 Defaults: English, Deutsch, and Français enabled; **Q** = Deutsch,
-**W** = Français, **E** = English. All choices persist in
+**W** = Français, **E** = English. Choices persist in
 `~/Library/Application Support/LocalFlow/settings.json`.
 
 ### Switching language mid-dictation
 
-While holding Right-Option, tap a quick key. The language name appears under
-the waveform, the current recording is transcribed in that language, and the
-choice stays until you change it again. Switching from English to any other
-language swaps the English-only `small.en` model for its multilingual
-sibling `small`; it downloads once, then both stay loaded so later switches
-are instant.
+While holding Right-Option, tap a fast key. The language name appears under
+the waveform, the recording in progress is transcribed in that language,
+and the choice stays until you change it. The first switch away from
+English swaps the English-only `small.en` model for the multilingual
+`small` (downloaded once, ~460 MB); both stay loaded afterwards, so later
+switches are instant.
 
 ### Command line
 
@@ -126,6 +127,14 @@ say -v Anna -o de.aiff "Guten Morgen, das ist ein Test"
 .venv/bin/python flow.py --transcribe de.aiff --language de
 ```
 
+Restart the service by hand:
+
+```bash
+launchctl kickstart -k gui/$(id -u)/com.localflow.dictation
+```
+
+Logs go to `~/Library/Logs/local-flow.log`.
+
 ## Models
 
 | Model       | Languages | Speed on CPU | Use when                          |
@@ -136,23 +145,14 @@ say -v Anna -o de.aiff "Guten Morgen, das ist ein Test"
 | `medium.en` | English   | ~3× slower   | accuracy matters more than speed  |
 | `medium`    | all 99    | ~3× slower   | accuracy in other languages       |
 
-Models download on first use to `~/.cache/huggingface`. On an Intel i9,
-`small` transcribes a 6-second clip in about 2 seconds; the optional cleanup
-adds 1–3 seconds.
-
-## How it stays private
-
-Everything runs as a local process on your Mac: the speech model is a file
-on disk, the cleanup model is served by Ollama on `localhost`, and the paste
-goes through the system clipboard. There is no telemetry, no update check,
-and no external service to sign up for.
+Models download on first use to `~/.cache/huggingface`.
 
 ## Uninstall
 
 ```bash
 launchctl bootout gui/$(id -u)/com.localflow.dictation
 rm ~/Library/LaunchAgents/com.localflow.dictation.plist
-rm -rf "~/Library/Application Support/LocalFlow"
+rm -rf /Applications/LocalFlow.app "$HOME/Library/Application Support/LocalFlow"
 rm -rf local-flow   # the cloned folder
 ```
 
@@ -164,15 +164,13 @@ rm -rf local-flow   # the cloned folder
 
 Layout: `flow.py` (pipeline, hotkey, paste), `focus.py` (remember and
 restore the target field), `overlay.py` (waveform), `splash.py` (startup
-card), `menubar.py` (status menu), `settings.py` + `languages.py`
-(persistent choices and the language catalog). The `launcher/` and
-`scripts/` folders hold an optional native Launchpad launcher with signed
-bundles and rollback, documented in `scripts/install-launcher.sh`.
+card), `menubar.py` (status menu), `settings.py` and `languages.py`
+(persistent choices and the language catalog), `install.sh` (installer),
+`launcher/` and `scripts/` (the Launchpad launcher, plus an advanced
+installer with fingerprinting and rollback for updating an existing setup).
 
-macOS only for now: the overlays, hotkey interception, and focus tracking
-are Cocoa, Quartz, and Accessibility code. The pipeline itself (mic →
-whisper → Ollama → clipboard) is portable; contributions for Linux and
-Windows front-ends are welcome.
+local-flow is macOS-only by design: the overlays, hotkey interception, and
+focus tracking are Cocoa, Quartz, and Accessibility code.
 
 ## License
 
