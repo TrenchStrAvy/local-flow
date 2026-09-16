@@ -1,0 +1,7 @@
+faster-whisper>=1.2,<2
+sounddevice>=0.5,<1
+pynput>=1.8,<2
+numpy>=1.26
+pyobjc-framework-Cocoa>=10
+pyobjc-framework-Quartz>=10
+pyobjc-framework-ApplicationServices>=10
