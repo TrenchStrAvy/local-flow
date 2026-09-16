@@ -1,0 +1,19 @@
+# environment
+.venv/
+__pycache__/
+*.pyc
+
+# local planning / scratch (not part of the product)
+task_plan.md
+findings.md
+progress.md
+docs/superpowers/
+
+# audio test clips and model caches
+*.aiff
+*.wav
+*.mp3
+.tmp-*.json
+
+# macOS
+.DS_Store
