@@ -8,7 +8,7 @@
 #   1. checks macOS + Python 3.10+
 #   2. creates .venv and installs the Python dependencies
 #   3. pre-downloads the speech model(s) so the first dictation is instant
-#   4. optionally installs Ollama + gemma3:4b for the cleanup pass
+#   4. optionally installs Ollama + gemma3:1b for the cleanup pass
 #   5. builds a named "LocalFlow" runtime app so macOS privacy settings show
 #      LocalFlow (not "Python"), puts a LocalFlow launcher in /Applications
 #      and Launchpad, and installs a LaunchAgent that starts it at login
@@ -17,7 +17,7 @@
 #   --multilingual     also pre-download the multilingual model (German,
 #                      French, … 99 languages; ~460 MB). Otherwise it is
 #                      fetched automatically the first time you switch.
-#   --with-cleanup     install Ollama + gemma3:4b (via Homebrew) and enable
+#   --with-cleanup     install Ollama + gemma3:1b (via Homebrew) and enable
 #                      the punctuation/filler cleanup pass
 #   --no-service       set up the venv and models only; don't install the
 #                      runtime, launcher, or login service
@@ -100,8 +100,8 @@ if $with_cleanup; then
     brew install ollama
   fi
   brew services start ollama >/dev/null 2>&1 || true
-  say "pulling gemma3:4b (~3 GB, once)"
-  ollama pull gemma3:4b
+  say "pulling gemma3:1b (~800 MB, once)"
+  ollama pull gemma3:1b
   service_args=(--ollama)
   ok "cleanup pass enabled"
 fi

@@ -9,7 +9,7 @@ nothing you say ever leaves the machine.
 ```
 Hold Right-Option → mic capture
     → faster-whisper (speech-to-text on your CPU, 99 languages)
-    → Ollama gemma3:4b (optional local cleanup: punctuation, filler words)
+    → Ollama gemma3:1b (optional local cleanup: punctuation, filler words)
     → pasted into the text field you started in
 ```
 
@@ -34,7 +34,8 @@ Hold Right-Option → mic capture
   removes "um", "äh", "euh". It never translates, and it is time-boxed so
   a slow model can never eat your words.
 - **Works on Intel Macs.** Uses the int8 CPU path, not Apple-Silicon-only
-  frameworks. A 6-second dictation lands in about 2 seconds on an i9.
+  frameworks. A 6-second dictation lands in about 1.3 seconds on an i9,
+  or about 2.5 seconds with the cleanup pass enabled.
 - **Native feel.** A mic icon in the menu bar, a floating waveform that
   ripples with your voice, a startup splash while the model loads, a
   LocalFlow icon in Launchpad, and a service that starts at login.
@@ -58,7 +59,7 @@ login service. Re-running it is safe.
 
 | Flag             | Effect                                                            |
 |------------------|-------------------------------------------------------------------|
-| `--with-cleanup` | install Ollama and gemma3:4b via Homebrew and enable the cleanup pass |
+| `--with-cleanup` | install Ollama and gemma3:1b via Homebrew and enable the cleanup pass |
 | `--multilingual` | pre-download the multilingual model now (~460 MB) instead of on first switch |
 | `--model NAME`   | pre-download a different Whisper model (`tiny.en`, `medium.en`)    |
 | `--no-service`   | set up the environment only; run `flow.py` from a terminal yourself |
@@ -171,6 +172,10 @@ installer with fingerprinting and rollback for updating an existing setup).
 
 local-flow is macOS-only by design: the overlays, hotkey interception, and
 focus tracking are Cocoa, Quartz, and Accessibility code.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

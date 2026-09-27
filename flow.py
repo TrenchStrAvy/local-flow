@@ -11,6 +11,7 @@ Pipeline:  hotkey → mic capture → faster-whisper (Stage 1)
 
 import argparse
 import json
+import os
 import queue
 import socket
 import subprocess
@@ -40,8 +41,9 @@ MIN_RECORDING_SEC = 0.4       # ignore accidental taps
 
 DEFAULT_MODEL = "small.en"    # good speed/accuracy balance on CPU
 OLLAMA_URL = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "gemma3:4b"
-OLLAMA_TIMEOUT = 8            # seconds; fall back to raw transcript after this
+OLLAMA_MODEL = "gemma3:1b"    # 1B is plenty for punctuation/filler cleanup
+OLLAMA_TIMEOUT = 4            # seconds; fall back to raw transcript after this
+CPU_THREADS = max(1, (os.cpu_count() or 8) // 2)   # physical cores (i9: 8)
 
 CLEANUP_PROMPT = (
     "Fix punctuation and capitalization, and remove filler words "
@@ -117,7 +119,8 @@ class Transcriber:
                       flush=True)
                 t0 = time.time()
                 self._models[name] = WhisperModel(
-                    name, device="cpu", compute_type="int8")
+                    name, device="cpu", compute_type="int8",
+                    cpu_threads=CPU_THREADS)
                 print(f"Model ready in {time.time() - t0:.1f}s", flush=True)
             return self._models[name]
 
@@ -138,7 +141,9 @@ class Transcriber:
         segments, _ = model.transcribe(
             audio,
             vad_filter=True,          # trim silence before decoding
+            vad_parameters={"min_silence_duration_ms": 300},
             beam_size=1,              # greedy: fastest, fine for dictation
+            condition_on_previous_text=False,  # no cross-segment context
             language=language,
         )
         return " ".join(s.text.strip() for s in segments).strip()
