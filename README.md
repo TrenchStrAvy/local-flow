@@ -9,8 +9,8 @@ nothing you say ever leaves the machine.
 ```
 Hold Right-Option → mic capture
     → faster-whisper (speech-to-text on your CPU, 99 languages)
-    → Ollama gemma3:1b (optional local cleanup: punctuation, filler words)
-    → pasted into the text field you started in
+    → words typed into your text field as you speak, corrected in place
+    → cleanup on release (fillers, capitalization; optional local LLM)
 ```
 
 ## Key features
@@ -30,9 +30,16 @@ Hold Right-Option → mic capture
 - **Text lands where you started.** If you click somewhere else while
   speaking or while transcription is running, local-flow brings the
   original app and text field back into focus before pasting.
-- **Optional local cleanup.** Fixes punctuation and capitalization and
-  removes "um", "äh", "euh". It never translates, and it is time-boxed so
-  a slow model can never eat your words.
+- **Words appear as you speak.** About a second and a half behind your
+  voice, the recognized words are typed straight into the field you are
+  dictating into. When later audio refines a word, it is corrected in
+  place. `--preview card` shows them in the overlay instead; `--preview
+  off` waits for release.
+- **Cleanup you can watch.** On release, filler words ("um", "äh", "euh")
+  vanish and capitalization and end punctuation are fixed, right in your
+  text. This pass is rule-based: it never rewrites a sentence. An optional
+  local LLM pass (`--ollama`, gemma3:4b) streams its edits the same way and
+  is discarded if it drops or invents content.
 - **Works on Intel Macs.** Uses the int8 CPU path, not Apple-Silicon-only
   frameworks. A 6-second dictation lands in about 1.3 seconds on an i9,
   or about 2.5 seconds with the cleanup pass enabled.
@@ -59,7 +66,7 @@ login service. Re-running it is safe.
 
 | Flag             | Effect                                                            |
 |------------------|-------------------------------------------------------------------|
-| `--with-cleanup` | install Ollama and gemma3:1b via Homebrew and enable the cleanup pass |
+| `--with-cleanup` | install Ollama and gemma3:4b via Homebrew and enable the cleanup pass |
 | `--multilingual` | pre-download the multilingual model now (~460 MB) instead of on first switch |
 | `--model NAME`   | pre-download a different Whisper model (`tiny.en`, `medium.en`)    |
 | `--no-service`   | set up the environment only; run `flow.py` from a terminal yourself |
@@ -79,9 +86,10 @@ Then click **LocalFlow** in Launchpad (or restart the service, below).
 ## Use
 
 Hold **Right-Option** while speaking and release when done. A thin waveform
-appears at the bottom of the screen while recording, settles into a calm
-ripple with "transcribing…" after release, and the text is pasted where your
-cursor was when you pressed the key.
+appears at the bottom of the screen while recording. Your words show up in
+the field where your cursor was when you pressed the key, a moment behind
+your voice; after release the cleanup pass tidies them and the wave goes
+away.
 
 Click the **mic icon** in the menu bar for everything else:
 
@@ -110,7 +118,8 @@ switches are instant.
 
 ```bash
 .venv/bin/python flow.py                     # run in a terminal (no service)
-.venv/bin/python flow.py --ollama            # with the cleanup pass
+.venv/bin/python flow.py --ollama            # add the local LLM cleanup pass
+.venv/bin/python flow.py --preview card      # words in the overlay, paste on release
 .venv/bin/python flow.py --language de       # start in German for this run
 .venv/bin/python flow.py --list-languages    # every supported code
 .venv/bin/python flow.py --add-language es   # add Spanish to the menu

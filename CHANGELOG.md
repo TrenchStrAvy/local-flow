@@ -1,5 +1,50 @@
 # Changelog
 
+## v0.3.0 — 2026-09-27: words as you speak
+
+Thank you to everyone using local-flow and sending feedback. This release
+comes directly from it.
+
+### What changed
+
+- **Live dictation.** While you hold Right-Option, recognized words are
+  typed into your text field about 1.5 s behind your voice and corrected
+  in place as more audio arrives. No more waiting for release to see
+  anything. `--preview card` shows them in the overlay instead; `--preview
+  off` restores the previous wait-then-paste behaviour.
+- **Cleanup is now rule-based by default.** Filler words are removed and
+  capitalization and end punctuation fixed, instantly and deterministically,
+  right in your text. The v0.2.0 default (gemma3:1b) could echo its own
+  instructions, so a dictation sometimes came out as "Keep it in English."
+  It also occasionally rewrote sentences. Both are gone.
+- **LLM cleanup is opt-in and guarded.** `--ollama` uses gemma3:4b again,
+  streams its edits into your text as they are produced, and any answer that
+  drops or invents content is discarded in favour of the transcript.
+  `--ollama-model NAME` picks a different model.
+- **Ellipses are pauses.** "keep the same... aesthetics" no longer gets a
+  capital after the dots.
+
+### Upgrading
+
+```bash
+cd local-flow && git pull && ./install.sh
+```
+
+If your service was installed with `--with-cleanup`, re-run with that flag
+to keep the LLM pass (it now needs gemma3:4b), or without it to use the
+rule-based cleanup. Then restart:
+
+```bash
+launchctl kickstart -k gui/$(id -u)/com.localflow.dictation
+```
+
+### Known limits
+
+Live typing sends keystrokes to the focused field, so it pauses if you
+click elsewhere while speaking and the final text goes back to the original
+field on release. A hands-free locked mode is next.
+
+
 ## v0.2.0 — 2026-09-27: faster dictation
 
 The time from releasing the key to text appearing in your document drops
