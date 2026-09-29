@@ -156,12 +156,13 @@ float3 u_c1;
 float3 u_c2;
 float3 u_c3;
 #pragma declaration
+float lf_ph(float t, float k) { return fmod(t * k, 6.2831853); }
 float3x3 lf_rotY(float a) { float c = cos(a), s = sin(a); return float3x3(float3(c, 0.0, -s), float3(0.0, 1.0, 0.0), float3(s, 0.0, c)); }
 float3x3 lf_rotX(float a) { float c = cos(a), s = sin(a); return float3x3(float3(1.0, 0.0, 0.0), float3(0.0, c, s), float3(0.0, -s, c)); }
 float lf_hash(float2 p) { return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453); }
 float lf_ribbon(float3 p, float3 A, float3 B, float3 C, float3 D, float ph, float amp, float spd, float width, float t) {
-    float f = dot(p, A) + amp * sin(dot(p, B) * 2.6 + t * 0.9 * spd + ph) + amp * 0.55 * sin(dot(p, C) * 4.1 - t * 1.4 * spd);
-    float g = dot(p, D) + 0.35 * sin(dot(p, B) * 1.7 - t * 0.6 * spd + ph * 0.5);
+    float f = dot(p, A) + amp * sin(dot(p, B) * 2.6 + lf_ph(t, 0.9 * spd) + ph) + amp * 0.55 * sin(dot(p, C) * 4.1 - lf_ph(t, 1.4 * spd));
+    float g = dot(p, D) + 0.35 * sin(dot(p, B) * 1.7 - lf_ph(t, 0.6 * spd) + ph * 0.5);
     float core = exp(-f * f / (width * width));
     float halo = exp(-f * f / (width * width * 6.0)) * 0.035;
     float strip = exp(-g * g / 0.16);
@@ -169,9 +170,9 @@ float lf_ribbon(float3 p, float3 A, float3 B, float3 C, float3 D, float ph, floa
 }
 float3 lf_wobble(float3 n, float lv, float t, float glass) {
     float a = (0.012 + 0.04 * lv) * (0.3 + 1.4 * glass);
-    float3 w = float3(sin(n.y * 5.0 + t * 1.3) * cos(n.z * 4.0 - t * 0.9),
-                      sin(n.z * 6.0 - t * 1.1) * cos(n.x * 3.0 + t * 0.7),
-                      sin(n.x * 4.5 + t * 1.7) * cos(n.y * 5.5 - t * 1.2));
+    float3 w = float3(sin(n.y * 5.0 + lf_ph(t, 1.3)) * cos(n.z * 4.0 - lf_ph(t, 0.9)),
+                      sin(n.z * 6.0 - lf_ph(t, 1.1)) * cos(n.x * 3.0 + lf_ph(t, 0.7)),
+                      sin(n.x * 4.5 + lf_ph(t, 1.7)) * cos(n.y * 5.5 - lf_ph(t, 1.2)));
     return normalize(n + a * w);
 }
 float3 lf_env(float3 d) {
@@ -222,7 +223,7 @@ if (h < 0.0) {
     float spd = 0.8 + 1.0 * lv;
     float width = 0.042 + 0.012 * lv;
     float bright = 1.1 + 1.1 * lv + 0.9 * u_pulse;
-    float3x3 M = lf_rotY(u_t * 0.18) * lf_rotX(0.35 + 0.15 * sin(u_t * 0.3));
+    float3x3 M = lf_rotY(lf_ph(u_t, 0.18)) * lf_rotX(0.35 + 0.15 * sin(lf_ph(u_t, 0.3)));
     float dither = lf_hash(uv * 512.0 + fract(u_t) * 17.0);
     float3 inner = float3(0.0);
     for (int k = 0; k < 3; k++) {

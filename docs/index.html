@@ -180,15 +180,18 @@ precision highp float;
 uniform vec2 u_res; uniform float u_t; uniform float u_level; uniform float u_pulse; uniform float u_dark;
 uniform vec3 u_c1; uniform vec3 u_c2; uniform vec3 u_c3; uniform float u_glass;
 
+float ph_(float k) { return mod(u_t * k, 6.2831853); }
 mat3 rotY(float a){ float c=cos(a), s=sin(a); return mat3(c,0.0,-s, 0.0,1.0,0.0, s,0.0,c); }
 mat3 rotX(float a){ float c=cos(a), s=sin(a); return mat3(1.0,0.0,0.0, 0.0,c,s, 0.0,-s,c); }
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
 // a wavy sheet intersected with a wavy slab: a ribbon of light
+// time phases are wrapped to one turn before any sine: GPUs lose precision
+// on large angles and the sheets would slowly turn to noise
 float ribbon(vec3 p, vec3 A, vec3 B, vec3 C, vec3 D, float ph, float amp, float spd, float width) {
-  float f = dot(p, A) + amp * sin(dot(p, B) * 2.6 + u_t * 0.9 * spd + ph)
-                      + amp * 0.55 * sin(dot(p, C) * 4.1 - u_t * 1.4 * spd);
-  float g = dot(p, D) + 0.35 * sin(dot(p, B) * 1.7 - u_t * 0.6 * spd + ph * 0.5);
+  float f = dot(p, A) + amp * sin(dot(p, B) * 2.6 + ph_(0.9 * spd) + ph)
+                      + amp * 0.55 * sin(dot(p, C) * 4.1 - ph_(1.4 * spd));
+  float g = dot(p, D) + 0.35 * sin(dot(p, B) * 1.7 - ph_(0.6 * spd) + ph * 0.5);
   float core = exp(-f * f / (width * width));
   float halo = exp(-f * f / (width * width * 6.0)) * 0.035;  // a faint scatter only
   float strip = exp(-g * g / 0.16);
@@ -198,9 +201,9 @@ float ribbon(vec3 p, vec3 A, vec3 B, vec3 C, vec3 D, float ph, float amp, float 
 // liquid surface: the glass itself breathes; the voice stirs it
 vec3 wobbleNormal(vec3 n, float lv) {
   float a = (0.012 + 0.04 * lv) * (0.3 + 1.4 * u_glass);
-  vec3 w = vec3(sin(n.y * 5.0 + u_t * 1.3) * cos(n.z * 4.0 - u_t * 0.9),
-                sin(n.z * 6.0 - u_t * 1.1) * cos(n.x * 3.0 + u_t * 0.7),
-                sin(n.x * 4.5 + u_t * 1.7) * cos(n.y * 5.5 - u_t * 1.2));
+  vec3 w = vec3(sin(n.y * 5.0 + ph_(1.3)) * cos(n.z * 4.0 - ph_(0.9)),
+                sin(n.z * 6.0 - ph_(1.1)) * cos(n.x * 3.0 + ph_(0.7)),
+                sin(n.x * 4.5 + ph_(1.7)) * cos(n.y * 5.5 - ph_(1.2)));
   return normalize(n + a * w);
 }
 
@@ -254,7 +257,7 @@ void main() {
   float spd = 0.8 + 1.0 * lv;
   float width = 0.042 + 0.012 * lv;
   float bright = 1.1 + 1.1 * lv + 0.9 * u_pulse;
-  mat3 M = rotY(u_t * 0.18) * rotX(0.35 + 0.15 * sin(u_t * 0.3));
+  mat3 M = rotY(ph_(0.18)) * rotX(0.35 + 0.15 * sin(ph_(0.3)));
   float dither = hash(gl_FragCoord.xy + fract(u_t) * 17.0);
 
   // refracted path through the glass, with a little dispersion
