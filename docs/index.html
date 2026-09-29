@@ -69,6 +69,7 @@
   @media (max-width: 640px) {
     .stage { grid-template-columns: 1fr; justify-items: center; gap: 18px; }
     .lang, .line { text-align: center; }
+    .lang { justify-items: center; }   /* language names flip in centred, no snap */
   }
   @media (prefers-reduced-motion: reduce) {
     .lang span.in, .lang span.out, .line .caret { animation: none; }
