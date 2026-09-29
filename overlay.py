@@ -147,6 +147,7 @@ ENERGY = {
 ENERGY_SHADER = """
 #pragma arguments
 float u_t;
+float u_flow;
 float u_level;
 float u_pulse;
 float u_dark;
@@ -160,9 +161,10 @@ float lf_ph(float t, float k) { return fmod(t * k, 6.2831853); }
 float3x3 lf_rotY(float a) { float c = cos(a), s = sin(a); return float3x3(float3(c, 0.0, -s), float3(0.0, 1.0, 0.0), float3(s, 0.0, c)); }
 float3x3 lf_rotX(float a) { float c = cos(a), s = sin(a); return float3x3(float3(1.0, 0.0, 0.0), float3(0.0, c, s), float3(0.0, -s, c)); }
 float lf_hash(float2 p) { return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453); }
-float lf_ribbon(float3 p, float3 A, float3 B, float3 C, float3 D, float ph, float amp, float spd, float width, float t) {
-    float f = dot(p, A) + amp * sin(dot(p, B) * 2.6 + lf_ph(t, 0.9 * spd) + ph) + amp * 0.55 * sin(dot(p, C) * 4.1 - lf_ph(t, 1.4 * spd));
-    float g = dot(p, D) + 0.35 * sin(dot(p, B) * 1.7 - lf_ph(t, 0.6 * spd) + ph * 0.5);
+float lf_ribbon(float3 p, float3 A, float3 B, float3 C, float3 D, float ph, float amp, float spd, float width, float flow) {
+    // flow is integrated by the app: speed follows the voice, the phase never jumps
+    float f = dot(p, A) + amp * sin(dot(p, B) * 2.6 + lf_ph(flow, 0.9 * spd) + ph) + amp * 0.55 * sin(dot(p, C) * 4.1 - lf_ph(flow, 1.4 * spd));
+    float g = dot(p, D) + 0.35 * sin(dot(p, B) * 1.7 - lf_ph(flow, 0.6 * spd) + ph * 0.5);
     float core = exp(-f * f / (width * width));
     float halo = exp(-f * f / (width * width * 6.0)) * 0.035;
     float strip = exp(-g * g / 0.16);
@@ -182,16 +184,16 @@ float3 lf_env(float3 d) {
     float panel = smoothstep(0.55, 0.95, dot(d, normalize(float3(0.6, 0.35, 0.7)))) * 0.35;
     return base + float3(1.0, 0.98, 0.95) * soft * 0.35 + float3(0.8, 0.85, 1.0) * panel * 0.5;
 }
-float3 lf_march(float3 ro, float3 rd, float tExit, float amp, float spd, float width, float3x3 M, float R, float dither, float t, float3 c1, float3 c2, float3 c3) {
+float3 lf_march(float3 ro, float3 rd, float tExit, float amp, float width, float3x3 M, float R, float dither, float flow, float3 c1, float3 c2, float3 c3) {
     float3 col = float3(0.0);
     const int STEPS = 48;
     float dt = tExit / float(STEPS);
     for (int i = 0; i < STEPS; i++) {
         float3 p = ro + rd * ((float(i) + dither) * dt);
         float3 q = M * (p / R);
-        float r1 = lf_ribbon(q, float3(0.0, 1.0, 0.0), float3(1.0, 0.2, 0.3), float3(0.4, 0.0, 1.0), float3(1.0, 0.0, 0.0), 0.0, amp, spd, width, t);
-        float r2 = lf_ribbon(q, float3(0.3, 0.8, 0.5), float3(0.2, 1.0, -0.4), float3(1.0, 0.3, 0.0), float3(0.0, 0.0, 1.0), 2.1, amp * 0.9, spd * 0.85, width, t);
-        float r3 = lf_ribbon(q, float3(-0.6, 0.5, 0.6), float3(0.5, -0.3, 1.0), float3(0.0, 1.0, 0.4), float3(0.8, 0.6, 0.0), 4.2, amp * 1.1, spd * 1.15, width * 0.9, t);
+        float r1 = lf_ribbon(q, float3(0.0, 1.0, 0.0), float3(1.0, 0.2, 0.3), float3(0.4, 0.0, 1.0), float3(1.0, 0.0, 0.0), 0.0, amp, 1.0, width, flow);
+        float r2 = lf_ribbon(q, float3(0.3, 0.8, 0.5), float3(0.2, 1.0, -0.4), float3(1.0, 0.3, 0.0), float3(0.0, 0.0, 1.0), 2.1, amp * 0.9, 0.85, width, flow);
+        float r3 = lf_ribbon(q, float3(-0.6, 0.5, 0.6), float3(0.5, -0.3, 1.0), float3(0.0, 1.0, 0.4), float3(0.8, 0.6, 0.0), 4.2, amp * 1.1, 1.15, width * 0.9, flow);
         float depth = clamp(length(q), 0.0, 1.0);
         float3 tint = mix(float3(0.92, 0.94, 1.0), float3(1.0), depth);
         col += ((c1 + 0.7 * r1) * r1 + (c2 + 0.7 * r2) * r2 + (c3 + 0.8 * r3) * r3) * tint;
@@ -220,7 +222,6 @@ if (h < 0.0) {
     float F = 0.04 + 0.96 * fres;
     float lv = u_level;
     float amp = 0.16 + 0.26 * lv;
-    float spd = 0.8 + 1.0 * lv;
     float width = 0.042 + 0.012 * lv;
     float bright = 1.1 + 1.1 * lv + 0.9 * u_pulse;
     float3x3 M = lf_rotY(lf_ph(u_t, 0.18)) * lf_rotX(0.35 + 0.15 * sin(lf_ph(u_t, 0.3)));
@@ -231,7 +232,7 @@ if (h < 0.0) {
         float3 rr = refract(rd, n, eta);
         float bb = dot(pIn, rr);
         float tOut = -bb + sqrt(max(0.0, bb * bb - (dot(pIn, pIn) - R * R)));
-        float3 sm = lf_march(pIn, rr, tOut, amp, spd, width, M, R, dither, u_t, u_c1, u_c2, u_c3);
+        float3 sm = lf_march(pIn, rr, tOut, amp, width, M, R, dither, u_flow, u_c1, u_c2, u_c3);
         inner[k] = sm[k];
     }
     inner *= bright * 2.6;
@@ -314,8 +315,9 @@ class EnergySphere:
     def set_dark(self, dark):
         self._f("u_dark", 1.0 if dark else 0.0)
 
-    def update(self, t, level, pulse, locked):
+    def update(self, t, flow, level, pulse, locked):
         self._f("u_t", t)
+        self._f("u_flow", flow)
         self._f("u_level", level)
         self._f("u_pulse", pulse)
         self._f("u_lock", 1.0 if locked else 0.0)
@@ -352,6 +354,7 @@ class PillView(NSView):
         self.rng = np.random.default_rng(7)
         self.surface = None
         self.energy = 0.0        # slow voice level for the energy sphere
+        self.flow = 0.0          # integrated ribbon phase (speed follows the voice)
         self.pulse = 0.0
         self._prev_raw = 0.0
         self.ref = 0.02          # running estimate of the speaker's loudness
@@ -529,8 +532,10 @@ class PillView(NSView):
                 self.pulse = max(self.pulse, min(1.0, raw / cfg["level_cap"]) * 0.9)
             self._prev_raw = raw
             self.pulse *= 0.02 ** (dt / cfg["pulse_sec"])
-            self.surface.update(self.t, self.energy, self.pulse,
-                                self.note.startswith("🔒"))
+            wrap = 200 * math.pi      # every phase multiplier is a multiple of 1/100 turn
+            self.flow = (self.flow + dt * (0.8 + 1.0 * self.energy)) % wrap
+            self.surface.update(self.t % wrap, self.flow, self.energy,
+                                self.pulse, self.note.startswith("🔒"))
         else:
             h = self._field(lv)
             rest = SPHERE_R * (1 + h)
