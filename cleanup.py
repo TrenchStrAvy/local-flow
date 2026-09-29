@@ -59,8 +59,13 @@ def _filler_pattern(language: str):
                       re.IGNORECASE | re.UNICODE)
 
 
-def rule_cleanup(text: str, language: str = "en") -> str:
-    """Filler removal + sentence capitalization + closing punctuation."""
+def rule_cleanup(text: str, language: str = "en", close: bool = True,
+                 capitalize_first: bool = True) -> str:
+    """Filler removal + sentence capitalization + closing punctuation.
+
+    `close=False` leaves the end open (a mid-dictation pause is not a full
+    stop); `capitalize_first=False` continues a sentence that is already
+    under way."""
     text = text.strip()
     if not text:
         return text
@@ -70,10 +75,45 @@ def rule_cleanup(text: str, language: str = "en") -> str:
     text = re.sub(r"^[,;:]\s*", "", text)               # leading orphan comma
     if not text:
         return text
-    text = text[0].upper() + text[1:]
+    if capitalize_first:
+        text = text[0].upper() + text[1:]
     text = _SENTENCE_END.sub(lambda m: m.group(1) + m.group(2).upper(), text)
-    if text[-1].isalnum():
+    if close and text[-1].isalnum():
         text += "."
+    return text
+
+
+def ends_sentence(text: str) -> bool:
+    """Does a following utterance start a new sentence?"""
+    return not text or text.rstrip()[-1] in ".!?…"
+
+
+def join(a: str, b: str) -> str:
+    return (a + " " + b).strip() if a and b else (a or b)
+
+
+# ---------------------------------------------------------------- sanity
+
+_HAS_TEXT = re.compile(r"\w", re.UNICODE)
+
+
+def strip_repeats(text: str, min_runs: int = 3) -> str:
+    """Cut a decoder loop: once a phrase of 1–4 words repeats `min_runs`
+    times back to back ("the the the", "a bit of a bit of a bit of"), keep
+    the text up to the first occurrence only. Junk with no letters or
+    digits ("//") becomes empty."""
+    if not _HAS_TEXT.search(text):
+        return ""
+    words = text.split()
+    norm = [_norm(w) for w in words]
+    for i in range(len(norm)):
+        for p in range(1, 5):
+            runs = 1
+            while (i + (runs + 1) * p <= len(norm)
+                   and norm[i + runs * p:i + (runs + 1) * p] == norm[i:i + p]):
+                runs += 1
+            if runs >= min_runs:
+                return " ".join(words[:i + p])
     return text
 
 

@@ -1,5 +1,49 @@
 # Changelog
 
+## v0.4.0 — 2026-09-29: hands-free lock
+
+Thank you for the feedback that shaped this release. Every fix below came
+from a real dictation someone reported.
+
+### What changed
+
+- **Option+A locks dictation on.** Hold Right-Option, tap A, let go; tap
+  Option+A again to finish. Speech is split into sentences on ~0.7 s pauses;
+  each is cleaned up and committed, and committed text is never corrected
+  again, so anything you type yourself stays intact.
+- **Focus-aware delivery.** Switch apps while locked and dictation keeps
+  listening; the words are typed the moment the original field has focus
+  again, or at the end.
+- **A fast model for the preview, the accurate one for the text.** The
+  live preview now runs `base.en` (about 0.4 s per update, so words appear
+  every half second); every committed or final sentence is decoded by
+  `small.en`. Preview corrections are word-based: a comma the preview
+  chose differently is left alone rather than retyping the line.
+- **No more decoder stalls or loops.** Whisper's temperature-fallback
+  ladder (up to six re-decodes on a chunk cut mid-word, 7 s stalls) is
+  off; repeated phrases ("the the the") are cut at the first repeat; the
+  preview decoder cannot repeat a trigram; an empty preview never deletes
+  anything.
+- **The app ignores its own keystrokes.** Typed words are tagged so the
+  hotkey listener no longer mistakes them for Option+A or a language key.
+- **No double paste.** Each dictation owns its typing state and its
+  preview loop, and all keystrokes go through one lock, so a quick second
+  press while a long dictation is still finalizing can no longer make it
+  type the whole section again or interleave stale preview text.
+- **Long dictations split at a pause.** Past the 24 s window the buffer is
+  cut at the last short pause instead of mid-word, so no sentence gets a
+  spurious full stop in the middle.
+
+### Upgrading
+
+```bash
+cd local-flow && git pull && ./install.sh
+launchctl kickstart -k gui/$(id -u)/com.localflow.dictation
+```
+
+The preview model (`base.en`, about 75 MB) downloads on first use.
+
+
 ## v0.3.0 — 2026-09-27: words as you speak
 
 Thank you to everyone using local-flow and sending feedback. This release

@@ -22,6 +22,11 @@ Hold Right-Option → mic capture
 - **99 languages.** English, Deutsch, Français, Español, 日本語, العربية and
   every other language Whisper knows. One multilingual model covers them
   all, so adding a language is a menu click, not a download.
+- **Hands-free lock.** Tap **A** while holding Right-Option and dictation
+  stays on after you let go. Speak in sentences; each one is committed on
+  the pause that follows it and never touched again. Switch to another app
+  and keep working: typing pauses and catches up the moment your field is
+  focused again. Tap Option+A once more to finish.
 - **Fast keys: switch language without stopping.** While holding
   Right-Option, tap **Q** for German, **W** for French, **E** for English
   (defaults). Assign Q, W, E, R, and T to any languages you like from the
@@ -105,6 +110,16 @@ Defaults: English, Deutsch, and Français enabled; **Q** = Deutsch,
 **W** = Français, **E** = English. Choices persist in
 `~/Library/Application Support/LocalFlow/settings.json`.
 
+### Locked (hands-free) dictation
+
+Hold **Right-Option**, tap **A**, let go. The waveform shows a 🔒 and the
+menu bar status says "locked". Everything you say is typed into the field
+you started in, sentence by sentence: a pause of about 0.7 s ends a
+sentence, which is then cleaned up and committed. If you click into
+another app, dictation keeps listening and the text is delivered when you
+return to the field (or when you finish). Hold Right-Option and tap **A**
+again to stop; the last sentence is finished and typed.
+
 ### Switching language mid-dictation
 
 While holding Right-Option, tap a fast key. The language name appears under
@@ -150,6 +165,7 @@ Logs go to `~/Library/Logs/local-flow.log`.
 | Model       | Languages | Speed on CPU | Use when                          |
 |-------------|-----------|--------------|-----------------------------------|
 | `tiny.en`   | English   | fastest      | latency over everything           |
+| `base.en`   | English   | fastest      | live preview only (auto-loaded)   |
 | `small.en`  | English   | fast         | **default**: best balance         |
 | `small`     | all 99    | fast         | auto-selected for non-English     |
 | `medium.en` | English   | ~3× slower   | accuracy matters more than speed  |

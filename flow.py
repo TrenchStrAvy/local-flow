@@ -50,14 +50,22 @@ HOTKEY = Key.alt_r            # Right-Option: hold to record
 MIN_RECORDING_SEC = 0.4       # ignore accidental taps
 
 DEFAULT_MODEL = "small.en"    # good speed/accuracy balance on CPU
+PREVIEW_MODEL = "base.en"     # fast model for the live preview only; every
+                              # committed or final sentence uses DEFAULT_MODEL
 OLLAMA_MODEL = "gemma3:4b"    # only opt-in; smaller models rewrite sentences
 CPU_THREADS = max(1, (os.cpu_count() or 8) // 2)   # physical cores (i9: 8)
 
+LOCK_KEYCODE = 0              # A: tap while holding Right-Option to lock on
 PREVIEW_MIN_SEC = 0.8         # don't preview until this much audio exists
 PREVIEW_STEP_SEC = 0.5        # new audio needed before re-transcribing
-PREVIEW_WINDOW_SEC = 24       # commit text older than this; decode the tail
-REUSE_TAIL_SEC = 0.6          # skip the final pass if the un-previewed tail
-REUSE_TAIL_RMS = 0.01         #   is shorter than this and this quiet
+PREVIEW_WINDOW_SEC = 24       # force a commit when an utterance gets this long
+ENDPOINT_SEC = 1.2            # this much silence ends a sentence (locked mode)
+SOFT_GAP_SEC = 0.4            # a long buffer is split at its last pause this long
+MIN_UTTERANCE_SEC = 2.0       # shorter segments wait for more speech: Whisper
+                              # needs context, and each decode has a fixed cost
+SILENCE_RMS = 0.01            # frame RMS below this is silence
+FRAME = SAMPLE_RATE // 10     # 100 ms analysis frames
+PREROLL_SEC = 0.3             # audio kept before speech starts
 SHOW_CORRECTIONS_SEC = 0.7    # how long the diff stays visible before paste
 
 
@@ -73,9 +81,10 @@ class Recorder:
         self.level = 0.0        # live mic RMS, read by the overlay
 
     def _on_audio(self, data, *_):
+        chunk = np.asarray(data, dtype=np.float32).reshape(-1).copy()
         with self._lock:
-            self._chunks.append(data.copy())
-        self.level = float(np.sqrt((data ** 2).mean()))
+            self._chunks.append(chunk)
+        self.level = float(np.sqrt((chunk ** 2).mean()))
 
     def snapshot(self) -> np.ndarray:
         """Everything captured so far (recording continues)."""
@@ -83,7 +92,15 @@ class Recorder:
             chunks = list(self._chunks)
         if not chunks:
             return np.zeros(0, dtype=np.float32)
-        return np.concatenate(chunks).flatten()
+        return np.concatenate(chunks)
+
+    def drop(self, n: int):
+        """Forget the first n samples (they are committed)."""
+        with self._lock:
+            if not self._chunks:
+                return
+            audio = np.concatenate(self._chunks)
+            self._chunks = [audio[n:]] if n < len(audio) else []
 
     def start(self):
         with self._lock:
@@ -115,9 +132,10 @@ class Transcriber:
     back and forth is instant after the first load.
     """
 
-    def __init__(self, base_model: str, language: str = "en"):
+    def __init__(self, base_model: str, language: str = "en", **decode):
         self.base_model = base_model
         self.language = language
+        self.decode = decode            # extra transcribe() options
         self._models = {}
         self._lock = threading.Lock()
         self._switch = threading.RLock()
@@ -156,10 +174,18 @@ class Transcriber:
             vad_filter=True,          # trim silence before decoding
             vad_parameters={"min_silence_duration_ms": 300},
             beam_size=1,              # greedy: fastest, fine for dictation
+            temperature=0.0,          # single pass: the default fallback
+                                      # ladder re-decodes up to 6× when a
+                                      # chunk is cut mid-word (7 s stalls)
             condition_on_previous_text=False,  # no cross-segment context
             language=language,
+            **self.decode,
         )
-        return " ".join(s.text.strip() for s in segments).strip()
+        # A window Whisper is fairly sure holds no speech is dropped; a
+        # segment that loops ("the the the") is cut at the first repeat.
+        keep = [cleanup.strip_repeats(s.text.strip()) for s in segments
+                if not (s.no_speech_prob > 0.6 and s.avg_logprob < -1.0)]
+        return " ".join(t for t in keep if t).strip()
 
 
 # ---------------------------------------------------------------- stage 2: cleanup
@@ -218,16 +244,27 @@ class FlowApp:
             preview = "card"
         self.preview = preview          # inline | card | off
         self.typer = typer.LiveTyper() if typer is not None else None
+        # every recording gets its own LiveTyper (a quick second press must
+        # not reset the state of a dictation still being finalized), and
+        # all keystrokes go through one lock so two jobs never interleave
+        self._type_lock = threading.Lock()
         self.language = language
         report(f"loading speech model "
                f"({settings.model_for_language(model_name, language)})", 0.3)
         self.transcriber = Transcriber(model_name, language)
+        report("loading preview model", 0.7)
+        # the preview decodes audio cut mid-word all the time, which makes
+        # small models loop; forbid repeated trigrams at the decoder
+        self.previewer = Transcriber(PREVIEW_MODEL, language,
+                                     no_repeat_ngram_size=3)
         report("almost there", 0.9)
         self.recorder = Recorder()
         self.use_ollama = use_ollama
         self.overlay = overlay
         self.menubar = None
         self.recording = False
+        self.locked = False
+        self._hotkey_down = False
         self.record_started = 0.0
         self.target = None          # where the text should land
         self._preview_thread = None
@@ -236,8 +273,9 @@ class FlowApp:
         threading.Thread(target=self._process_loop, daemon=True).start()
 
     def status_text(self) -> str:
+        mode = " · locked" if self.locked else ""
         return (f"model {self.transcriber.model_name} · cleanup "
-                f"{OLLAMA_MODEL if self.use_ollama else 'rules'}")
+                f"{OLLAMA_MODEL if self.use_ollama else 'rules'}{mode}")
 
     # -- language (called from the menu bar, on the main thread)
 
@@ -248,7 +286,7 @@ class FlowApp:
         settings.set_language(code)
         self.language = code
         if self.overlay:
-            self.overlay.set_note(languages.native_name(code))
+            self.overlay.set_note(self._note(languages.native_name(code)))
         if self.menubar:
             self.menubar.set_language(code)
             self.menubar.set_status("loading model…")
@@ -256,6 +294,7 @@ class FlowApp:
         def _switch():
             try:
                 self.transcriber.set_language(code)
+                self.previewer.set_language(code)
                 print(f"\nlanguage → {languages.label(code)} "
                       f"({self.transcriber.model_name})", flush=True)
             except Exception as exc:
@@ -265,87 +304,240 @@ class FlowApp:
                 self.menubar.set_status(self.status_text())
         threading.Thread(target=_switch, daemon=True).start()
 
+    def _note(self, text=""):
+        return ("🔒 " + text).strip() if self.locked else text
+
     # -- hotkey handlers (must return fast; heavy work goes to the worker)
 
-    def on_press(self, key):
-        if self.recording and getattr(key, "vk", None) is not None:
-            code = settings.quick_keys_by_keycode().get(key.vk)
+    def on_press(self, key, injected=False):
+        if injected:            # our own typing (typer.py), not the user
+            return
+        vk = getattr(key, "vk", None)
+        if self._hotkey_down and self.recording and vk is not None:
+            if vk == LOCK_KEYCODE:
+                self._toggle_lock()
+                return
+            code = settings.quick_keys_by_keycode().get(vk)
             if code:
                 self.set_language(code)
                 return
-        if key == HOTKEY and not self.recording:
-            self.recording = True
-            self.record_started = time.time()
-            self.target = focus.capture() if focus is not None else None
-            self.recorder.start()
-            if self.overlay:
-                self.overlay.set_note("")
-            if self.overlay:
-                self.overlay.show_recording()
-            self._preview_state = {"text": "", "committed": "",
-                                   "committed_n": 0, "seen_n": 0,
-                                   "target": self.target}
-            if self.typer:
-                self.typer.reset()
-            if self.preview != "off":
-                self._preview_thread = threading.Thread(
-                    target=self._preview_loop, daemon=True)
-                self._preview_thread.start()
-            print("● recording... (release to transcribe)", flush=True)
+        if key == HOTKEY:
+            self._hotkey_down = True
+            if not self.recording:
+                self._start_recording()
 
-    def on_release(self, key):
-        if key == HOTKEY and self.recording:
-            self.recording = False
+    def on_release(self, key, injected=False):
+        if injected:
+            return
+        if key == HOTKEY:
+            self._hotkey_down = False
+            if self.recording and not self.locked:
+                self._stop_recording()
+
+    def _start_recording(self):
+        self.recording = True
+        self.record_started = time.time()
+        self.target = focus.capture() if focus is not None else None
+        self.recorder.start()
+        if self.overlay:
+            self.overlay.set_note(self._note())
+            self.overlay.show_recording()
+        if self.typer is not None:
+            self.typer = typer.LiveTyper()
+        self._preview_state = {"text": "", "committed": "",
+                               "seen_n": 0, "target": self.target,
+                               "typer": self.typer, "active": True}
+        if self.preview != "off":
+            self._preview_thread = threading.Thread(
+                target=self._preview_loop, daemon=True)
+            self._preview_thread.start()
+        print("● recording... (release to transcribe)", flush=True)
+
+    def _stop_recording(self):
+        self.recording = False
+        self.locked = False
+        self._preview_state["active"] = False   # this job's loop must end
+        try:
             audio = self.recorder.stop()
-            if time.time() - self.record_started < MIN_RECORDING_SEC:
-                if self.overlay:
-                    self.overlay.hide()
-                print("  (too short, ignored)")
-                return
+        except Exception as exc:     # never leave the app stuck recording
+            print(f"warning: recorder failed: {exc}", flush=True)
             if self.overlay:
-                self.overlay.show_transcribing()
-            self.worker.put((audio, self.target, self._preview_thread,
-                             self._preview_state))
+                self.overlay.hide()
+            return
+        st = self._preview_state
+        if (time.time() - self.record_started < MIN_RECORDING_SEC
+                and not st.get("committed")):
+            if self.overlay:
+                self.overlay.hide()
+            print("  (too short, ignored)")
+            return
+        if self.overlay:
+            self.overlay.show_transcribing()
+        self.worker.put((audio, self.target, self._preview_thread, st))
 
-    # -- live preview (runs while the key is held)
+    def _toggle_lock(self):
+        """Option+A: keep dictating after Right-Option is released; press
+        again to finish."""
+        if self.locked:
+            print("🔓 unlocked", flush=True)
+            self._stop_recording()
+            if self.menubar:
+                self.menubar.set_status(self.status_text())
+            return
+        self.locked = True
+        print("🔒 locked: dictation stays on until Option+A again",
+              flush=True)
+        if self.overlay:
+            self.overlay.set_note(self._note())
+        if self.menubar:
+            self.menubar.set_status(self.status_text())
+
+    # -- live preview (runs while recording)
+
+    @staticmethod
+    def _frame_rms(audio):
+        n = len(audio) // FRAME
+        if n == 0:
+            return np.zeros(0)
+        frames = audio[: n * FRAME].reshape(n, FRAME)
+        return np.sqrt((frames ** 2).mean(axis=1))
+
+    @staticmethod
+    def _utterance_end(rms):
+        """Sample index where the first finished utterance ends: the start
+        of the first silence gap of ENDPOINT_SEC after speech (plus half
+        the gap, so the decoder sees the trailing pause). None if the
+        utterance is still going."""
+        speech = np.flatnonzero(rms > SILENCE_RMS)
+        if len(speech) == 0:
+            return None
+        gap = int(ENDPOINT_SEC * SAMPLE_RATE / FRAME)
+        for a, b in zip(speech[:-1], speech[1:]):
+            if b - a > gap:
+                return int((a + 1 + gap // 2) * FRAME)
+        if len(rms) - 1 - speech[-1] >= gap:
+            return int((speech[-1] + 1 + gap // 2) * FRAME)
+        return None
+
+    @staticmethod
+    def _last_pause(rms, min_gap_sec=SOFT_GAP_SEC):
+        """Sample index in the middle of the last silence gap of at least
+        `min_gap_sec`, or None: where to split a long buffer without
+        cutting a word."""
+        speech = np.flatnonzero(rms > SILENCE_RMS)
+        gap = int(min_gap_sec * SAMPLE_RATE / FRAME)
+        for a, b in zip(speech[-2::-1], speech[::-1]):   # newest first
+            if b - a > gap:
+                return int((a + 1 + (b - a) // 2) * FRAME)
+        return None
 
     def _preview_loop(self):
-        """Re-transcribe the captured audio about once a second and show the
-        words. Text older than PREVIEW_WINDOW_SEC is committed and only the
-        tail is decoded, so long dictations stay cheap."""
+        """Every ~0.5 s of new audio: transcribe the current utterance and
+        show it. Once an utterance ends (ENDPOINT_SEC of silence anywhere
+        in the buffer, so a slow decode can't miss a pause) it is cleaned
+        up, committed, and its audio dropped: the next decode is short and
+        committed words are never corrected again."""
         st = self._preview_state
-        while self.recording:
+        # `st["active"]`, not `self.recording`: a quick new press flips the
+        # shared flag back on, and this loop must not outlive its own job
+        while st["active"]:
             audio = self.recorder.snapshot()
             n = len(audio)
-            if (n < PREVIEW_MIN_SEC * SAMPLE_RATE
-                    or n - st["seen_n"] < PREVIEW_STEP_SEC * SAMPLE_RATE):
+            if n - st["seen_n"] < PREVIEW_STEP_SEC * SAMPLE_RATE:
                 time.sleep(0.05)
                 continue
-            tail = audio[st["committed_n"]:]
+            rms = self._frame_rms(audio)
+            speech = np.flatnonzero(rms > SILENCE_RMS)
+            if len(speech) == 0:
+                # nothing but silence: keep a little pre-roll, drop the rest
+                keep = int(PREROLL_SEC * SAMPLE_RATE)
+                if n > keep:
+                    self.recorder.drop(n - keep)
+                st["seen_n"] = min(n, keep)
+                continue
+            # decode only up to shortly after the last speech: trailing
+            # silence costs time and invites hallucinated repeats
+            last_speech = int((speech[-1] + 1) * FRAME
+                              + PREROLL_SEC * SAMPLE_RATE)
+            if n < PREVIEW_MIN_SEC * SAMPLE_RATE:
+                time.sleep(0.05)
+                continue
+            # sentence commits: only while locked (a held dictation is
+            # decoded whole on release, with full context), on a real pause,
+            # and never for a scrap shorter than MIN_UTTERANCE_SEC
+            end = self._utterance_end(rms) if self.locked else None
+            if end is not None and end < MIN_UTTERANCE_SEC * SAMPLE_RATE:
+                end = None
+            if end is None and n > PREVIEW_WINDOW_SEC * SAMPLE_RATE:
+                pause = self._last_pause(rms)
+                end = pause if pause and pause > MIN_UTTERANCE_SEC * SAMPLE_RATE else n
+            if end is None and last_speech <= st.get("spoken_n", 0):
+                st["seen_n"] = n            # no new speech: nothing to do
+                continue
             try:
-                text = self.transcriber.transcribe(tail)
+                if end is not None:
+                    text = self.transcriber.transcribe(audio[:end])
+                else:
+                    st["spoken_n"] = last_speech
+                    text = self.previewer.transcribe(
+                        audio[:min(n, last_speech)])
             except Exception as exc:       # never let preview kill dictation
                 print(f"warning: preview failed: {exc}", flush=True)
                 return
-            # even if the key was released mid-decode, the result covers
-            # audio up to `n`; the final pass may reuse it
+            if not st["active"]:
+                return                          # released mid-decode
+            if end is not None:
+                self._commit(st, text, end)     # then loop at once: the
+                continue                        # rest may hold more speech
             st["seen_n"] = n
-            st["text"] = (st["committed"] + " " + text).strip()
-            self._show(st["text"], self._preview_state.get("target"))
-            if len(tail) > PREVIEW_WINDOW_SEC * SAMPLE_RATE:
-                st["committed"] = st["text"]
-                st["committed_n"] = n
+            if not text:
+                continue                        # never wipe the field
+            st["text"] = cleanup.join(st["committed"], text)
+            self._show(st["text"], st.get("target"), soft=True, st=st)
 
-    def _show(self, text, target, words=None):
+    def _commit(self, st, text, n):
+        """Finish a sentence: clean it up (without closing it unless it is
+        already closed), correct the field, and lock it. Inline, the
+        correction is word-based so a comma the preview model chose
+        differently is left alone instead of retyping the sentence; the
+        committed record is then whatever the field actually reads."""
+        language = self.transcriber.language
+        clean = cleanup.rule_cleanup(
+            text, language, close=False,
+            capitalize_first=cleanup.ends_sentence(st["committed"]))
+        st["committed"] = cleanup.join(st["committed"], clean)
+        st["text"] = st["committed"]
+        ty = st.get("typer")
+        inline = self.preview == "inline" and ty
+        if inline and self._show_allowed(st.get("target")):
+            with self._type_lock:
+                ty.update(st["text"], soft=True)
+                ty.commit()
+                st["committed"] = st["text"] = ty.typed
+        elif not inline:
+            self._show(st["text"], st.get("target"), st=st)
+        self.recorder.drop(n)
+        st["seen_n"] = 0
+        st["spoken_n"] = 0
+        if clean:
+            print(f"  ✓ {clean}", flush=True)
+
+    def _show_allowed(self, target) -> bool:
+        if focus is None or target is None:
+            return True
+        current = focus._focused_element()
+        return current is None or current == target.element
+
+    def _show(self, text, target, words=None, soft=False, st=None):
         """Put `text` where the user can see it: typed into the target
         field (inline) or in the overlay card. Inline typing is skipped
-        while focus is away from the target; the final pass restores it."""
-        if self.preview == "inline" and self.typer:
-            if focus is not None and target is not None:
-                current = focus._focused_element()
-                if current is not None and current != target.element:
-                    return
-            self.typer.update(text)
+        while focus is away from the target and catches up when it is
+        back; the final pass restores focus."""
+        ty = (st or {}).get("typer", self.typer)
+        if self.preview == "inline" and ty:
+            if self._show_allowed(target):
+                with self._type_lock:
+                    ty.update(text, soft=soft)
         elif self.overlay and self.preview == "card":
             if words is not None:
                 self.overlay.set_words(words)
@@ -354,42 +546,51 @@ class FlowApp:
 
     # -- background pipeline
 
-    def _final_text(self, audio, preview_thread, st) -> str:
-        """Transcript of the whole recording. Reuses the last preview when
-        it already covers everything but a short, silent tail."""
+    def _final_tail(self, audio, preview_thread, st) -> str:
+        """Accurate transcript of the audio not yet committed (waits for an
+        in-flight preview decode first; those are short with base.en)."""
         if preview_thread is not None:
             preview_thread.join()
-        tail = audio[st.get("seen_n", 0):]
-        if (st.get("text") and len(tail) < REUSE_TAIL_SEC * SAMPLE_RATE
-                and (len(tail) == 0
-                     or float(np.sqrt((tail ** 2).mean())) < REUSE_TAIL_RMS)):
-            return st["text"]
-        committed_n = st.get("committed_n", 0)
-        text = self.transcriber.transcribe(audio[committed_n:])
-        return (st.get("committed", "") + " " + text).strip()
+        rms = self._frame_rms(audio)
+        if not np.any(rms > SILENCE_RMS):
+            return ""
+        return self.transcriber.transcribe(audio)
 
     def _process_loop(self):
         while True:
             audio, target, preview_thread, st = self.worker.get()
+            held = False
             try:
                 t0 = time.time()
-                raw = self._final_text(audio, preview_thread, st)
+                committed = st.get("committed", "")
+                tail = self._final_tail(audio, preview_thread, st)
+                raw = cleanup.join(committed, tail)
                 if not raw:
                     print("  (heard nothing)")
                     continue
                 stt_ms = (time.time() - t0) * 1000
-                inline = self.preview == "inline" and self.typer
+                ty = st.get("typer")
+                inline = self.preview == "inline" and ty
                 if inline and focus is not None and target is not None:
                     if not focus.restore(target):
                         print(f"  (could not refocus {target.app_name}; "
                               f"typing into the current app)")
-                self._show(raw, None)
+                if inline:
+                    self._type_lock.acquire()   # released in `finally`
+                    held = True
+                    ty.update(raw, soft=True)
+                else:
+                    self._show(raw, None, soft=True, st=st)
                 if self.overlay:
                     self.overlay.show_cleaning()
 
                 t1 = time.time()
                 language = self.transcriber.language
-                text = cleanup.rule_cleanup(raw, language)
+                text = cleanup.join(committed, cleanup.rule_cleanup(
+                    tail, language,
+                    capitalize_first=cleanup.ends_sentence(committed)))
+                text = cleanup.rule_cleanup(text, language,
+                                            capitalize_first=False)
                 if self.use_ollama:
                     text = cleanup.ollama_cleanup(
                         text, language, OLLAMA_MODEL,
@@ -401,17 +602,19 @@ class FlowApp:
                     print(f"  raw: {raw}")
                     if inline:
                         time.sleep(0.25)      # let the raw text register
-                        self._show(text, None)
+                        ty.update(text, soft=True)
                     elif self.overlay and self.preview == "card":
                         self.overlay.set_words(cleanup.word_diff(raw, text))
                         time.sleep(SHOW_CORRECTIONS_SEC)
                 print(f"→ {text}   [stt {stt_ms:.0f}ms, cleanup "
                       f"{clean_ms:.0f}ms]", flush=True)
                 if inline:
-                    self.typer.update(text)   # no-op if already there
+                    ty.update(text, soft=True)   # words only
                 else:
                     inject_text(text, target)
             finally:
+                if held:
+                    self._type_lock.release()
                 if self.overlay:
                     self.overlay.hide()
 
@@ -429,7 +632,8 @@ class FlowApp:
         return _on_partial
 
     def start_listener(self):
-        print(f"Hold Right-Option to dictate. Cleanup: "
+        print(f"Hold Right-Option to dictate, tap A while holding to lock "
+              f"it on. Cleanup: "
               f"{'ollama/' + OLLAMA_MODEL if self.use_ollama else 'rules'}. "
               f"Language: {languages.label(self.language)}. Ctrl+C to quit.",
               flush=True)
@@ -440,15 +644,19 @@ class FlowApp:
         return self.listener
 
     def _intercept(self, event_type, event):
-        """Swallow Q/W/E while the hotkey is held so Option+Q doesn't
-        also type 'œ' into the target app. Everything else passes."""
-        if self.recording:
+        """Swallow Q/W/E (language) and A (lock) while the hotkey is held so
+        Option+Q doesn't also type 'œ' into the target app. Everything else
+        passes, including Option combos while dictation is locked."""
+        if self._hotkey_down and self.recording:
             try:
                 from Quartz import (CGEventGetIntegerValueField,
+                                    kCGEventSourceUserData,
                                     kCGKeyboardEventKeycode)
-                if CGEventGetIntegerValueField(
-                        event, kCGKeyboardEventKeycode) in \
-                        settings.quick_keys_by_keycode():
+                if (typer is not None and CGEventGetIntegerValueField(
+                        event, kCGEventSourceUserData) == typer.TAG):
+                    return event        # our own typing: pass it through
+                vk = CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode)
+                if vk == LOCK_KEYCODE or vk in settings.quick_keys_by_keycode():
                     return None
             except Exception:
                 pass
