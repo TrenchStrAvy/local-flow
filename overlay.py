@@ -130,9 +130,9 @@ def _appearance_is_dark():
 # flowing inside, rendered by a single fragment shader on a quad (SceneKit,
 # Metal). Tuned in the browser mock-up; ENERGY holds that snapshot.
 ENERGY = {
-    "hues": (262.0, 218.0, 28.0),   # ribbon colours, degrees
-    "sat": 0.80,
-    "glass": 0.60,                  # refraction / reflection / rim strength
+    "hues": (236.0, 184.0, 290.0),  # ribbon colours, degrees (picked in the browser)
+    "sat": 0.23,
+    "glass": 1.00,                  # refraction / reflection / rim strength
     "level_gain": 4.2,              # floor mapping (mic RMS → level) for the first second
     "level_cap": 0.48,
     "speech_level": 0.26,           # where your normal speaking volume lands
