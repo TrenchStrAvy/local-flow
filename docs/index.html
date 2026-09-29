@@ -306,19 +306,46 @@ void main() {
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     // the configuration picked for the Mac app
     const HUES = [236, 184, 290], SAT = 0.23, GLASS = 1.0;
+    // how strongly the sphere reacts while a sentence is transcribed:
+    // [level while typing, pulse strength, spacing between pulses]
+    const SENSITIVITY = 0.55;               // picked with ?tune
+    const SENS = [0, 0, 0];
+    // one dial for the whole reaction: 0 = calm, 100 = very lively
+    let FLOW_GAIN = 1.0;
+    function setSensitivity(v) {             // v in 0..1
+      SENS[0] = 0.08 + 0.72 * v;             // level while typing (0.08 → 0.80)
+      SENS[1] = 0.20 + 0.80 * v;             // pulse strength (0.20 → 1.00)
+      SENS[2] = 0.36 - 0.26 * v;             // pulse spacing (0.36 → 0.10)
+      FLOW_GAIN = 1.0 + 2.0 * v;             // how much the voice speeds the ribbons
+    }
+    setSensitivity(SENSITIVITY);
+    // ?tune shows the dial; the live page never sees it
+    if (new URLSearchParams(location.search).has('tune')) {
+      const panel = document.createElement('div');
+      panel.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:10;background:#fff;border:1px solid #E6E8EC;border-radius:14px;padding:14px 16px;font:500 13px Manrope,sans-serif;color:#111318;box-shadow:0 6px 24px rgba(0,0,0,.06);display:grid;gap:10px;width:300px';
+      const label = document.createElement('label'); label.htmlFor = 'sens'; label.style.cssText = 'display:flex;justify-content:space-between';
+      const val = document.createElement('b'); label.append('Sensitivity', val);
+      const input = document.createElement('input'); input.type = 'range'; input.id = 'sens'; input.min = 0; input.max = 100; input.step = 1; input.value = Math.round(SENSITIVITY * 100); input.style.accentColor = '#5B6EE1';
+      const copy = document.createElement('button'); copy.type = 'button'; copy.textContent = 'Copy value';
+      copy.style.cssText = 'justify-self:start;border:1px solid #E6E8EC;background:#fff;border-radius:999px;padding:6px 12px;font:500 12px Manrope,sans-serif;cursor:pointer';
+      const sync = () => { setSensitivity(input.value / 100); val.textContent = input.value; };
+      input.addEventListener('input', sync); sync();
+      copy.addEventListener('click', () => navigator.clipboard.writeText('sensitivity ' + input.value).then(() => { copy.textContent = 'Copied'; setTimeout(() => { copy.textContent = 'Copy value'; }, 1500); }).catch(() => {}));
+      panel.append(label, input, copy); document.body.appendChild(panel);
+    }
     function hsl(h, s, l) { const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l), f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))); return [f(0), f(8), f(4)]; }
     const COLS = HUES.map(h => hsl(h, SAT, 0.62));
     let t = 0, flow = 0, level = 0.05, pulse = 0, last = performance.now(), nextPulseAt = 0;
     function frame(now) {
       const dt = Math.min(0.05, (now - last) / 1000); last = now; t = (t + dt) % WRAP;
       // the sphere "hears" the sentence being transcribed
-      const target = typing ? 0.11 + 0.02 * Math.sin(t * 7) : 0.05;
+      const target = typing ? SENS[0] + 0.02 * Math.sin(t * 7) : 0.05;
       const k = target > level ? 1 - Math.pow(0.02, dt / 0.28) : 1 - Math.pow(0.02, dt / 1.2);
       level += (target - level) * k;
-      if (typing && typeProgress > nextPulseAt) { pulse = Math.max(pulse, 0.25); nextPulseAt = typeProgress + 0.34; }
+      if (typing && typeProgress > nextPulseAt) { pulse = Math.max(pulse, SENS[1]); nextPulseAt = typeProgress + SENS[2]; }
       if (!typing) nextPulseAt = 0;
       pulse *= Math.pow(0.02, dt / 1.0);
-      flow = (flow + dt * (0.8 + 1.0 * level)) % WRAP;   // integrated flow phase: speed follows the voice, no jumps
+      flow = (flow + dt * (0.8 + FLOW_GAIN * level)) % WRAP;   // integrated flow phase: speed follows the voice, no jumps
       if (window.__sphereHidden) { requestAnimationFrame(frame); return; }   // evaporated: nothing to draw
       const r = canvas.getBoundingClientRect(), dpr = Math.min(matchMedia('(pointer: coarse)').matches ? 1.25 : 1.5, devicePixelRatio || 1);
       const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
