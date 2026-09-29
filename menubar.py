@@ -46,17 +46,17 @@ def _group_for(name: str) -> str:
 
 
 def _menubar_icon():
-    """The sphere as a monochrome template glyph (assets/menubar@2x.png),
-    with the system mic symbol as a fallback."""
+    """The Sorph sphere in full colour (assets/menubar-color@2x.png), with
+    the system mic symbol as a fallback. Returns (image, is_template)."""
     import os
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        "assets", "menubar@2x.png")
+                        "assets", "menubar-color@2x.png")
     icon = NSImage.alloc().initWithContentsOfFile_(path)
     if icon is not None:
         icon.setSize_((18, 18))
-        return icon
-    return NSImage.imageWithSystemSymbolName_accessibilityDescription_(
-        "mic.fill", "Sorph")
+        return icon, False
+    return (NSImage.imageWithSystemSymbolName_accessibilityDescription_(
+        "mic.fill", "Sorph"), True)
 
 
 def _item(title, action=None, target=None, represented=None, enabled=True):
@@ -86,9 +86,9 @@ class MenuBar(NSObject):
         # keep a reference on self — a GC'd status item vanishes from the bar
         self.item = NSStatusBar.systemStatusBar().statusItemWithLength_(
             NSVariableStatusItemLength)
-        icon = _menubar_icon()
+        icon, template = _menubar_icon()
         if icon is not None:
-            icon.setTemplate_(True)   # adapts to light/dark menu bar
+            icon.setTemplate_(template)   # colour sphere; mic is a template
             self.item.button().setImage_(icon)
         else:
             self.item.button().setTitle_("◎")
