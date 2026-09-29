@@ -1,4 +1,4 @@
-"""Transcript cleanup for local-flow.
+"""Transcript cleanup for Sorph.
 
 Two flavours, both returning plain text:
 

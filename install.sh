@@ -1,8 +1,8 @@
 #!/bin/zsh
-# local-flow installer — offline, multilingual dictation for macOS.
+# Sorph installer — offline, multilingual dictation for macOS.
 #
-#   git clone https://github.com/TrenchStrAvy/local-flow.git
-#   cd local-flow && ./install.sh
+#   git clone https://github.com/TrenchStrAvy/sorph.git
+#   cd sorph && ./install.sh
 #
 # What it does (all local; nothing is sent anywhere):
 #   1. checks macOS + Python 3.10+
@@ -57,7 +57,7 @@ root=${0:A:h}
 cd "$root"
 
 # 1. platform ----------------------------------------------------------------
-[[ $(uname -s) == Darwin ]] || die "local-flow supports macOS only"
+[[ $(uname -s) == Darwin ]] || die "Sorph supports macOS only"
 
 python=$(command -v python3 || true)
 [[ -n $python ]] || die "python3 not found — install it from python.org or 'brew install python'"
@@ -130,13 +130,14 @@ build_runtime() {
   local pb=/usr/libexec/PlistBuddy plist="$tmp/LocalFlow.app/Contents/Info.plist"
   $pb -c 'Set :CFBundleExecutable LocalFlow' "$plist"
   $pb -c 'Set :CFBundleIdentifier com.localflow.app' "$plist"
-  $pb -c 'Set :CFBundleName LocalFlow' "$plist"
-  $pb -c 'Set :CFBundleDisplayName LocalFlow' "$plist" 2>/dev/null \
-    || $pb -c 'Add :CFBundleDisplayName string LocalFlow' "$plist"
+  $pb -c 'Set :CFBundleName Sorph' "$plist"
+  $pb -c 'Set :CFBundleDisplayName Sorph' "$plist" 2>/dev/null \
+    || $pb -c 'Add :CFBundleDisplayName string Sorph' "$plist"
   $pb -c 'Set :LSUIElement true' "$plist" 2>/dev/null \
     || $pb -c 'Add :LSUIElement bool true' "$plist"
-  $pb -c 'Add :NSMicrophoneUsageDescription string "LocalFlow transcribes your dictation locally using the microphone."' "$plist" 2>/dev/null \
-    || $pb -c 'Set :NSMicrophoneUsageDescription "LocalFlow transcribes your dictation locally using the microphone."' "$plist"
+  $pb -c 'Add :NSMicrophoneUsageDescription string "Sorph transcribes your dictation locally using the microphone."' "$plist" 2>/dev/null \
+    || $pb -c 'Set :NSMicrophoneUsageDescription "Sorph transcribes your dictation locally using the microphone."' "$plist"
+  install_icon "$tmp/LocalFlow.app"
   /usr/bin/codesign --force --deep --sign - --timestamp=none "$tmp/LocalFlow.app" >/dev/null 2>&1
   # the stub must still find its framework from the new location
   if ! "$tmp/LocalFlow.app/Contents/MacOS/LocalFlow" -c 'import sys' >/dev/null 2>&1; then
@@ -147,6 +148,17 @@ build_runtime() {
   rm -rf "$runtime_app"
   mv "$tmp/LocalFlow.app" "$runtime_app"
   rm -rf "$tmp"
+}
+
+install_icon() {
+  # the sphere on a white rounded square, for the permission panes. Only
+  # for a freshly built runtime: changing an installed bundle changes its
+  # signature and macOS forgets the permissions granted to it.
+  local app=$1
+  scripts/make-icns.sh "$app/Contents/Resources/LocalFlow.icns" 2>/dev/null || return 0
+  /usr/libexec/PlistBuddy -c 'Set :CFBundleIconFile LocalFlow.icns' "$app/Contents/Info.plist" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c 'Add :CFBundleIconFile string LocalFlow.icns' "$app/Contents/Info.plist"
+  touch "$app"
 }
 
 if [[ -d $runtime_app && $(bundle_id "$runtime_app") == com.localflow.app ]] \
@@ -177,7 +189,7 @@ if command -v swiftc >/dev/null; then
   tmp_launcher=$(mktemp -d "${TMPDIR:-/tmp}/localflow-launcher.XXXXXX")/LocalFlow.app
   if scripts/build-launcher.sh "$tmp_launcher" >/dev/null 2>&1; then
     if [[ -d $visible_app && $(bundle_id "$visible_app") != com.localflow.launcher ]]; then
-      warn "$visible_app exists but isn't the local-flow launcher; leaving it alone"
+      warn "$visible_app exists but isn't the Sorph launcher; leaving it alone"
     elif rm -rf "$visible_app" 2>/dev/null && mv "$tmp_launcher" "$visible_app" 2>/dev/null; then
       ok "installed launcher: $visible_app (also in Launchpad)"
     else

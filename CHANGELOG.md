@@ -2,7 +2,7 @@
 
 ## v0.5.0 — 2026-09-29: the sphere
 
-Thank you for trying local-flow and for the feedback. This release is the
+Thank you for trying Sorph and for the feedback. This release is the
 one you asked for most: something worth looking at while you speak.
 
 ### What changed
@@ -28,7 +28,7 @@ one you asked for most: something worth looking at while you speak.
 ### Upgrading
 
 ```bash
-cd local-flow && git pull && ./install.sh
+cd sorph && git pull && ./install.sh
 launchctl kickstart -k gui/$(id -u)/com.localflow.dictation
 ```
 
@@ -73,7 +73,7 @@ from a real dictation someone reported.
 ### Upgrading
 
 ```bash
-cd local-flow && git pull && ./install.sh
+cd sorph && git pull && ./install.sh
 launchctl kickstart -k gui/$(id -u)/com.localflow.dictation
 ```
 
@@ -82,7 +82,7 @@ The preview model (`base.en`, about 75 MB) downloads on first use.
 
 ## v0.3.0 — 2026-09-27: words as you speak
 
-Thank you to everyone using local-flow and sending feedback. This release
+Thank you to everyone using Sorph and sending feedback. This release
 comes directly from it.
 
 ### What changed
@@ -107,7 +107,7 @@ comes directly from it.
 ### Upgrading
 
 ```bash
-cd local-flow && git pull && ./install.sh
+cd sorph && git pull && ./install.sh
 ```
 
 If your service was installed with `--with-cleanup`, re-run with that flag

@@ -107,7 +107,7 @@ private final class Launcher {
             }
             guard result.status == 0 else {
                 return fail(
-                    "Could not inspect the LocalFlow service. "
+                    "Could not inspect the Sorph service. "
                         + commandDiagnostic(result)
                 )
             }
@@ -121,7 +121,7 @@ private final class Launcher {
             if inspection.running {
                 guard let pid = inspection.pid, pid > 0 else {
                     return fail(
-                        "LocalFlow reports running without a valid PID; "
+                        "Sorph reports running without a valid PID; "
                             + "startup was not changed."
                     )
                 }
@@ -129,13 +129,13 @@ private final class Launcher {
             }
             let kickstart = try launchctl.run(["kickstart", target])
             guard kickstart.status == 0 else {
-                return fail("Could not start the LocalFlow service.")
+                return fail("Could not start the Sorph service.")
             }
             return try pollUntilRunning(target)
                 ? 0
                 : fail(startupFailureMessage())
         } catch {
-            return fail("Could not launch LocalFlow: \(error.localizedDescription)")
+            return fail("Could not launch Sorph: \(error.localizedDescription)")
         }
     }
 
@@ -162,7 +162,7 @@ private final class Launcher {
             .path
         let bootstrap = try launchctl.run(["bootstrap", domain, plist])
         guard bootstrap.status == 0 else {
-            return fail("Could not load the LocalFlow service.")
+            return fail("Could not load the Sorph service.")
         }
 
         let inspectionResult = try launchctl.run(["print", target])
@@ -178,7 +178,7 @@ private final class Launcher {
 
         let kickstart = try launchctl.run(["kickstart", target])
         guard kickstart.status == 0 else {
-            return fail("Could not start the LocalFlow service.")
+            return fail("Could not start the Sorph service.")
         }
         return try pollUntilRunning(target)
             ? 0
@@ -207,9 +207,9 @@ private final class Launcher {
         let observed = lastInspectionOutput
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if observed.isEmpty {
-            return "LocalFlow did not remain running after startup."
+            return "Sorph did not remain running after startup."
         }
-        return "LocalFlow did not remain running after startup. Last state: \(observed)"
+        return "Sorph did not remain running after startup. Last state: \(observed)"
     }
 
     private func inspect(_ output: String) -> ServiceInspection {

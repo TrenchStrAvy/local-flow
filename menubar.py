@@ -6,7 +6,7 @@ languages, assign quick keys, and quit. Must be created on the main
 thread, before AppHelper.runEventLoop().
 
 Menu layout:
-    local-flow — hold Right-Option to dictate
+    Sorph — hold Right-Option to dictate
     model small.en · cleanup gemma3:4b
     ─────
     Language: Deutsch ▸   (enabled languages, checkmark on current)
@@ -14,7 +14,7 @@ Menu layout:
     Add language ▸        (full Whisper catalog, grouped A–Z)
     Remove language ▸
     ─────
-    Quit local-flow
+    Quit Sorph
 """
 
 import objc
@@ -45,6 +45,20 @@ def _group_for(name: str) -> str:
     return GROUPS[-1]
 
 
+def _menubar_icon():
+    """The sphere as a monochrome template glyph (assets/menubar@2x.png),
+    with the system mic symbol as a fallback."""
+    import os
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "assets", "menubar@2x.png")
+    icon = NSImage.alloc().initWithContentsOfFile_(path)
+    if icon is not None:
+        icon.setSize_((18, 18))
+        return icon
+    return NSImage.imageWithSystemSymbolName_accessibilityDescription_(
+        "mic.fill", "Sorph")
+
+
 def _item(title, action=None, target=None, represented=None, enabled=True):
     entry = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
         title, action, "")
@@ -72,17 +86,16 @@ class MenuBar(NSObject):
         # keep a reference on self — a GC'd status item vanishes from the bar
         self.item = NSStatusBar.systemStatusBar().statusItemWithLength_(
             NSVariableStatusItemLength)
-        icon = NSImage.imageWithSystemSymbolName_accessibilityDescription_(
-            "mic.fill", "local-flow")
+        icon = _menubar_icon()
         if icon is not None:
             icon.setTemplate_(True)   # adapts to light/dark menu bar
             self.item.button().setImage_(icon)
         else:
-            self.item.button().setTitle_("🎙")
+            self.item.button().setTitle_("◎")
 
         menu = NSMenu.alloc().init()
         menu.setAutoenablesItems_(False)
-        menu.addItem_(_item("local-flow — hold Right-Option to dictate",
+        menu.addItem_(_item("Sorph — hold Right-Option to dictate",
                             enabled=False))
         self.status = _item(status_text, enabled=False)
         menu.addItem_(self.status)
@@ -112,7 +125,7 @@ class MenuBar(NSObject):
 
         menu.addItem_(NSMenuItem.separatorItem())
         menu.addItem_(NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-            "Quit local-flow", b"terminate:", "q"))
+            "Quit Sorph", b"terminate:", "q"))
         self.item.setMenu_(menu)
         self._rebuild()
         return self

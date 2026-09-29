@@ -52,12 +52,7 @@ else
 fi
 chmod 755 "$bundle/Contents/MacOS/LocalFlow"
 
-swiftc -parse-as-library \
-  "$project_root/launcher/IconGenerator.swift" \
-  -o "$build_temp/IconGenerator"
-"$build_temp/IconGenerator" "$build_temp/LocalFlow.iconset"
-iconutil -c icns "$build_temp/LocalFlow.iconset" \
-  -o "$bundle/Contents/Resources/LocalFlow.icns"
+"$project_root/scripts/make-icns.sh" "$bundle/Contents/Resources/LocalFlow.icns"
 
 plutil -lint "$bundle/Contents/Info.plist" >/dev/null
 codesign --force --deep --sign - --timestamp=none "$bundle"

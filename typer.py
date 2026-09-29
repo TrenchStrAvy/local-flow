@@ -1,4 +1,4 @@
-"""Inline typing for local-flow: put words into the focused field as they
+"""Inline typing for Sorph: put words into the focused field as they
 are recognized, and correct them in place.
 
 The overlay is not involved. LiveTyper remembers what it has typed so far;

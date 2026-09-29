@@ -1,4 +1,4 @@
-# local-flow
+# Sorph
 
 **Free, private, multilingual dictation for macOS.** Hold a key, speak,
 release. Your words appear in the text field you were typing in.
@@ -33,7 +33,7 @@ Hold Right-Option → mic capture
   menu bar. The letter never reaches your document; the current sentence
   is transcribed in the new language.
 - **Text lands where you started.** If you click somewhere else while
-  speaking or while transcription is running, local-flow brings the
+  speaking or while transcription is running, Sorph brings the
   original app and text field back into focus before pasting.
 - **Words appear as you speak.** About a second and a half behind your
   voice, the recognized words are typed straight into the field you are
@@ -55,7 +55,7 @@ Hold Right-Option → mic capture
   as a loud one. Put it in any screen corner from the menu bar, or drag
   it anywhere you like.
 - **Native feel.** A mic icon in the menu bar, a startup splash while the
-  model loads, a LocalFlow icon in Launchpad, and a service that starts
+  model loads, a Sorph icon in Launchpad, and a service that starts
   at login.
 - **Clipboard-safe.** Whatever you had copied is restored after the paste.
 
@@ -64,15 +64,15 @@ Hold Right-Option → mic capture
 macOS 13 or later, Python 3.10 or later. One command after cloning:
 
 ```bash
-git clone https://github.com/TrenchStrAvy/local-flow.git
-cd local-flow
+git clone https://github.com/TrenchStrAvy/sorph.git
+cd sorph
 ./install.sh
 ```
 
 The installer creates a virtual environment, installs dependencies,
-downloads the speech model, builds a named **LocalFlow** runtime app (so
-macOS privacy settings show "LocalFlow" instead of "Python"), places a
-**LocalFlow** launcher in `/Applications` and Launchpad, and installs a
+downloads the speech model, builds a named **Sorph** runtime app (so
+macOS privacy settings show "Sorph" instead of "Python"), places a
+**Sorph** launcher in `/Applications` and Launchpad, and installs a
 login service. Re-running it is safe.
 
 | Flag             | Effect                                                            |
@@ -86,13 +86,13 @@ login service. Re-running it is safe.
 
 macOS will not let any program listen for a global hotkey or paste into
 other apps without these. In **System Settings → Privacy & Security**,
-grant them to **LocalFlow**:
+grant them to **Sorph**:
 
 1. **Microphone**: macOS asks automatically on the first recording.
 2. **Accessibility**: needed to paste and to re-focus the original field.
 3. **Input Monitoring**: needed for the hotkey and the fast keys.
 
-Then click **LocalFlow** in Launchpad (or restart the service, below).
+Then click **Sorph** in Launchpad (or restart the service, below).
 
 ## Use
 
@@ -115,7 +115,7 @@ Click the **mic icon** in the menu bar for everything else:
 | **Quick keys ▸**      | assign Q / W / E / R / T to any enabled language, or clear them |
 | **Add language ▸**    | browse the full catalog (grouped A–Z) and add one to the menu   |
 | **Remove language ▸** | take one out of the menu and off its fast key                   |
-| **Quit local-flow**   | stop the service until you start it again from Launchpad        |
+| **Quit Sorph**   | stop the service until you start it again from Launchpad        |
 
 Defaults: English, Deutsch, and Français enabled; **Q** = Deutsch,
 **W** = Français, **E** = English. Choices persist in
@@ -170,7 +170,7 @@ Restart the service by hand:
 launchctl kickstart -k gui/$(id -u)/com.localflow.dictation
 ```
 
-Logs go to `~/Library/Logs/local-flow.log`.
+Logs go to `~/Library/Logs/Sorph.log`.
 
 ## Models
 
@@ -191,7 +191,7 @@ Models download on first use to `~/.cache/huggingface`.
 launchctl bootout gui/$(id -u)/com.localflow.dictation
 rm ~/Library/LaunchAgents/com.localflow.dictation.plist
 rm -rf /Applications/LocalFlow.app "$HOME/Library/Application Support/LocalFlow"
-rm -rf local-flow   # the cloned folder
+rm -rf Sorph   # the cloned folder
 ```
 
 ## Development
@@ -207,7 +207,7 @@ card), `menubar.py` (status menu), `settings.py` and `languages.py`
 `launcher/` and `scripts/` (the Launchpad launcher, plus an advanced
 installer with fingerprinting and rollback for updating an existing setup).
 
-local-flow is macOS-only by design: the overlays, hotkey interception, and
+Sorph is macOS-only by design: the overlays, hotkey interception, and
 focus tracking are Cocoa, Quartz, and Accessibility code.
 
 ## Changelog

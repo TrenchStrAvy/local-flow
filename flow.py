@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""local-flow — a free, fully offline Wispr Flow clone for macOS.
+"""Sorph — free, private dictation for macOS.
 
 Hold Right-Option → speak → release. Your words are transcribed locally
 with faster-whisper, optionally cleaned up by a local Ollama model, and
@@ -683,7 +683,7 @@ class FlowApp:
 
 def acquire_single_instance_lock():
     """Bind a localhost port as a cross-process mutex. Returns the socket
-    (keep it alive!) or None if another local-flow is already running."""
+    (keep it alive!) or None if another Sorph is already running."""
     lock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         lock.bind(("127.0.0.1", 47611))
@@ -748,7 +748,7 @@ def main():
             settings.add_language(code)
             settings.set_quick_key(slot.lower(), code)
             print(f"quick key {slot.upper()} → {languages.label(code)}")
-        print("restart local-flow (or reopen the menu) to see the change")
+        print("restart Sorph (or reopen the menu) to see the change")
         return
 
     language = args.language or settings.get_language()
@@ -771,7 +771,7 @@ def main():
 
     lock = acquire_single_instance_lock()
     if lock is None:
-        print("another local-flow instance is already running — exiting")
+        print("another Sorph instance is already running — exiting")
         return
 
     try:

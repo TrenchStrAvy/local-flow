@@ -6,7 +6,7 @@
   <key>CFBundleDevelopmentRegion</key>
   <string>English</string>
   <key>CFBundleDisplayName</key>
-  <string>LocalFlow</string>
+  <string>Sorph</string>
   <key>CFBundleExecutable</key>
   <string>LocalFlow</string>
   <key>CFBundleIconFile</key>
@@ -16,7 +16,7 @@
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>LocalFlow</string>
+  <string>Sorph</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>

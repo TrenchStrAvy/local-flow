@@ -1,5 +1,5 @@
 """Startup splash — a centered card with a thin progress bar shown while
-local-flow loads its speech model, then fades away once dictation is ready.
+Sorph loads its speech model, then fades away once dictation is ready.
 
 Gives the launcher click immediate visible feedback (think FL Studio's
 splash) instead of several silent seconds before the mic icon appears.
@@ -82,7 +82,7 @@ class SplashView(NSView):
             NSForegroundColorAttributeName:
                 NSColor.colorWithCalibratedWhite_alpha_(ink, 1.0),
         }
-        title = NSString.stringWithString_("local-flow")
+        title = NSString.stringWithString_("Sorph")
         ts = title.sizeWithAttributes_(title_attrs)
         title.drawAtPoint_withAttributes_(
             NSMakePoint((W - ts.width) / 2, H - 22 - ts.height / 2 - 6),

@@ -1,4 +1,4 @@
-"""Persistent user settings for local-flow.
+"""Persistent user settings for Sorph.
 
 Stored as JSON in ~/Library/Application Support/LocalFlow/settings.json so
 choices survive restarts of the LaunchAgent. Reads and writes are

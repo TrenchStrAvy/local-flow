@@ -1,7 +1,7 @@
 """Catalog of every language the multilingual Whisper models can transcribe.
 
 Nothing is downloaded per language: one multilingual model (e.g. `small`)
-covers all of these. "Adding" a language in local-flow only makes it
+covers all of these. "Adding" a language in Sorph only makes it
 selectable in the menu and assignable to a quick key.
 
 code → (native name, English name)
