@@ -48,9 +48,15 @@ Hold Right-Option → mic capture
 - **Works on Intel Macs.** Uses the int8 CPU path, not Apple-Silicon-only
   frameworks. A 6-second dictation lands in about 1.3 seconds on an i9,
   or about 2.5 seconds with the cleanup pass enabled.
-- **Native feel.** A mic icon in the menu bar, a floating waveform that
-  ripples with your voice, a startup splash while the model loads, a
-  LocalFlow icon in Launchpad, and a service that starts at login.
+- **A sphere that listens.** A small ball of liquid glass with ribbons of
+  light flowing inside, rendered on the GPU. It refracts what is behind
+  it, and your voice bends the ribbons, stirs the glass and lights the
+  rim. It adapts to how loud you speak, so a quiet voice moves it as much
+  as a loud one. Put it in any screen corner from the menu bar, or drag
+  it anywhere you like.
+- **Native feel.** A mic icon in the menu bar, a startup splash while the
+  model loads, a LocalFlow icon in Launchpad, and a service that starts
+  at login.
 - **Clipboard-safe.** Whatever you had copied is restored after the paste.
 
 ## Install
@@ -90,11 +96,16 @@ Then click **LocalFlow** in Launchpad (or restart the service, below).
 
 ## Use
 
-Hold **Right-Option** while speaking and release when done. A thin waveform
-appears at the bottom of the screen while recording. Your words show up in
-the field where your cursor was when you pressed the key, a moment behind
-your voice; after release the cleanup pass tidies them and the wave goes
-away.
+Hold **Right-Option** while speaking and release when done. The glass
+sphere appears while recording and reacts to your voice. Your words show up
+in the field where your cursor was when you pressed the key, a moment
+behind your voice; after release the cleanup pass tidies them and the
+sphere goes away.
+
+**Sphere position.** Menu bar → **Sphere position**: bottom left (default),
+bottom center, bottom right, top left, top right, or **Move freely…** to
+drag it anywhere. Press **Return** or choose **Done moving** to keep the
+spot. `--position top-right` works from the command line too.
 
 Click the **mic icon** in the menu bar for everything else:
 
@@ -112,7 +123,8 @@ Defaults: English, Deutsch, and Français enabled; **Q** = Deutsch,
 
 ### Locked (hands-free) dictation
 
-Hold **Right-Option**, tap **A**, let go. The waveform shows a 🔒 and the
+Hold **Right-Option**, tap **A**, let go. The sphere's rim turns amber, the
+caption shows a 🔒, and the
 menu bar status says "locked". Everything you say is typed into the field
 you started in, sentence by sentence: a pause of about 0.7 s ends a
 sentence, which is then cleaned up and committed. If you click into
@@ -123,7 +135,7 @@ again to stop; the last sentence is finished and typed.
 ### Switching language mid-dictation
 
 While holding Right-Option, tap a fast key. The language name appears under
-the waveform, the recording in progress is transcribed in that language,
+the sphere, the recording in progress is transcribed in that language,
 and the choice stays until you change it. The first switch away from
 English swaps the English-only `small.en` model for the multilingual
 `small` (downloaded once, ~460 MB); both stay loaded afterwards, so later
@@ -189,7 +201,7 @@ rm -rf local-flow   # the cloned folder
 ```
 
 Layout: `flow.py` (pipeline, hotkey, paste), `focus.py` (remember and
-restore the target field), `overlay.py` (waveform), `splash.py` (startup
+restore the target field), `overlay.py` (glass sphere), `splash.py` (startup
 card), `menubar.py` (status menu), `settings.py` and `languages.py`
 (persistent choices and the language catalog), `install.sh` (installer),
 `launcher/` and `scripts/` (the Launchpad launcher, plus an advanced

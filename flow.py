@@ -312,6 +312,10 @@ class FlowApp:
     def on_press(self, key, injected=False):
         if injected:            # our own typing (typer.py), not the user
             return
+        if (key == Key.enter and self.menubar is not None
+                and getattr(self.menubar, "moving", False)):
+            self.menubar.finish_move()      # Enter = "Done moving"
+            return
         vk = getattr(key, "vk", None)
         if self._hotkey_down and self.recording and vk is not None:
             if vk == LOCK_KEYCODE:
@@ -645,8 +649,18 @@ class FlowApp:
 
     def _intercept(self, event_type, event):
         """Swallow Q/W/E (language) and A (lock) while the hotkey is held so
-        Option+Q doesn't also type 'œ' into the target app. Everything else
-        passes, including Option combos while dictation is locked."""
+        Option+Q doesn't also type 'œ' into the target app, and Enter while
+        the sphere is being moved. Everything else passes, including Option
+        combos while dictation is locked."""
+        if self.menubar is not None and getattr(self.menubar, "moving", False):
+            try:
+                from Quartz import (CGEventGetIntegerValueField,
+                                    kCGKeyboardEventKeycode)
+                if CGEventGetIntegerValueField(
+                        event, kCGKeyboardEventKeycode) == 36:   # Return
+                    return None
+            except Exception:
+                pass
         if self._hotkey_down and self.recording:
             try:
                 from Quartz import (CGEventGetIntegerValueField,
@@ -701,6 +715,10 @@ def main():
     parser.add_argument("--language", metavar="CODE",
                         help="dictation language code, e.g. de (default: "
                              "last choice from the menu bar, else en)")
+    parser.add_argument("--position", choices=settings.POSITIONS,
+                        help="where the sphere sits (saved, also in the "
+                             "menu bar): bottom-left, bottom-center, "
+                             "bottom-right, top-left, top-right")
     parser.add_argument("--list-languages", action="store_true",
                         help="print every supported language code and exit")
     parser.add_argument("--add-language", metavar="CODE", action="append",
@@ -710,6 +728,8 @@ def main():
     args = parser.parse_args()
     if args.ollama_model:
         OLLAMA_MODEL = args.ollama_model
+    if args.position:
+        settings.set_position(args.position)
 
     if args.list_languages:
         enabled = set(settings.get_languages())
@@ -794,7 +814,8 @@ def run_with_ui(args, language, lock):
         app.overlay = overlay
         overlay.level_source = lambda: app.recorder.level
         app.menubar = create_menubar(
-            app.status_text(), app.language, app.set_language)
+            app.status_text(), app.language, app.set_language,
+            on_position=overlay.set_position, on_move=overlay.move_mode)
         app.start_listener()
         splash.finish()
 

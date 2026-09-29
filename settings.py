@@ -9,6 +9,8 @@ Keys:
   languages   codes shown in the menu bar's Language submenu
   quick_keys  {"q": "de", ...} letters that switch language while the
               dictation hotkey is held
+  position    where the sphere sits on screen: bottom-left (default),
+              bottom-center, bottom-right, top-left, top-right
 """
 
 import json
@@ -136,6 +138,44 @@ def set_quick_key(slot: str, code) -> dict:
 def quick_keys_by_keycode() -> dict:
     """{12: "de", ...} for the hotkey listener."""
     return {KEYCODES[k]: v for k, v in get_quick_keys().items()}
+
+
+# ---------------------------------------------------------------- position
+
+POSITIONS = ["bottom-left", "bottom-center", "bottom-right",
+             "top-left", "top-right"]
+CUSTOM = "custom"             # anywhere: dragged there, saved as position_xy
+DEFAULT_POSITION = "bottom-left"
+
+
+def get_position() -> str:
+    data = load()
+    pos = data.get("position", DEFAULT_POSITION)
+    if pos == CUSTOM and get_position_xy() is not None:
+        return CUSTOM
+    return pos if pos in POSITIONS else DEFAULT_POSITION
+
+
+def set_position(pos: str) -> str:
+    if pos not in POSITIONS:
+        raise ValueError(f"unsupported position: {pos}")
+    save(position=pos)
+    return pos
+
+
+def get_position_xy():
+    """(x, y) of the window's bottom-left corner in screen points when the
+    sphere was dragged somewhere, else None."""
+    xy = load().get("position_xy")
+    if (isinstance(xy, list) and len(xy) == 2
+            and all(isinstance(v, (int, float)) for v in xy)):
+        return float(xy[0]), float(xy[1])
+    return None
+
+
+def set_position_xy(x: float, y: float) -> None:
+    save(position=CUSTOM, position_xy=[round(float(x), 1),
+                                       round(float(y), 1)])
 
 
 # ---------------------------------------------------------------- models

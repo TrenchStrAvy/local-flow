@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.5.0 — 2026-09-29: the sphere
+
+Thank you for trying local-flow and for the feedback. This release is the
+one you asked for most: something worth looking at while you speak.
+
+### What changed
+
+- **A liquid-glass sphere replaces the waveform.** A small ball of glass
+  with three ribbons of light flowing inside, rendered on the GPU by a
+  single Metal shader: refraction, dispersion, a studio reflection, a rim
+  that catches the light, and a surface that breathes. Your voice bends
+  the ribbons, speeds the flow, stirs the glass, and each syllable sends a
+  pulse along the ribbons and the rim. It is translucent, so the desktop
+  shows through, and reads on a light desktop as smoked glass.
+- **It adapts to your voice.** The sphere tracks how loud you actually
+  speak over the last few seconds and maps that to its normal response,
+  so a quiet voice moves it as much as a loud one. Its response eases in
+  over a quarter second and out over a second, never twitching.
+- **Locked mode is visible.** The rim turns amber while dictation is
+  locked on.
+- **Put it where you want.** Menu bar → Sphere position: five presets, or
+  Move freely to drag it anywhere on screen; Return or Done moving keeps
+  the spot. `--position` on the command line. The choice persists.
+- The particle sphere remains as a fallback when SceneKit is unavailable.
+
+### Upgrading
+
+```bash
+cd local-flow && git pull && ./install.sh
+launchctl kickstart -k gui/$(id -u)/com.localflow.dictation
+```
+
+The installer adds one dependency, the SceneKit binding (`pyobjc-framework-
+SceneKit`), which the sphere needs.
+
+
 ## v0.4.0 — 2026-09-29: hands-free lock
 
 Thank you for the feedback that shaped this release. Every fix below came

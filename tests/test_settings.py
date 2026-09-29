@@ -96,3 +96,26 @@ class CatalogTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PositionTests(SettingsTests):
+    def test_position_round_trip(self) -> None:
+        s = self.settings
+        self.assertEqual(s.get_position(), "bottom-left")
+        self.assertEqual(s.set_position("top-right"), "top-right")
+        self.assertEqual(s.get_position(), "top-right")
+        with self.assertRaises(ValueError):
+            s.set_position("middle")
+        s.save(position="nowhere")
+        self.assertEqual(s.get_position(), "bottom-left")
+
+    def test_custom_position_round_trip(self) -> None:
+        s = self.settings
+        self.assertIsNone(s.get_position_xy())
+        s.set_position_xy(812.4, 96)
+        self.assertEqual(s.get_position(), "custom")
+        self.assertEqual(s.get_position_xy(), (812.4, 96.0))
+        s.set_position("top-left")                  # preset wins again
+        self.assertEqual(s.get_position(), "top-left")
+        s.save(position="custom", position_xy="bad")
+        self.assertEqual(s.get_position(), "bottom-left")

@@ -58,12 +58,15 @@ def _item(title, action=None, target=None, represented=None, enabled=True):
 
 class MenuBar(NSObject):
 
-    def initWithStatusText_language_onLanguage_(self, status_text, language,
-                                                 on_language):
+    def initWithStatusText_language_onLanguage_onPosition_onMove_(
+            self, status_text, language, on_language, on_position, on_move):
         self = objc.super(MenuBar, self).init()
         if self is None:
             return None
         self.on_language = on_language
+        self.on_position = on_position
+        self.on_move = on_move
+        self.moving = False
         self.language = language
 
         # keep a reference on self — a GC'd status item vanishes from the bar
@@ -100,6 +103,12 @@ class MenuBar(NSObject):
         self.remove_item = _item("Remove language")
         self.remove_item.setSubmenu_(NSMenu.alloc().initWithTitle_("Remove"))
         menu.addItem_(self.remove_item)
+
+        menu.addItem_(NSMenuItem.separatorItem())
+        self.position_item = _item("Sphere position")
+        self.position_item.setSubmenu_(
+            NSMenu.alloc().initWithTitle_("Sphere position"))
+        menu.addItem_(self.position_item)
 
         menu.addItem_(NSMenuItem.separatorItem())
         menu.addItem_(NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
@@ -183,6 +192,25 @@ class MenuBar(NSObject):
                                        b"removeLanguage:", self, code,
                                        enabled=len(enabled) > 1))
 
+        pos_menu = self.position_item.submenu()
+        pos_menu.removeAllItems()
+        pos_menu.setAutoenablesItems_(False)
+        current = settings.get_position()
+        pos_menu.addItem_(_item("Done moving" if self.moving
+                                else "Move freely…", b"toggleMove:", self))
+        pos_menu.addItem_(NSMenuItem.separatorItem())
+        for pos in settings.POSITIONS:
+            entry = _item(pos.replace("-", " ").capitalize(),
+                          b"choosePosition:", self, pos)
+            entry.setState_(NSControlStateValueOn if pos == current
+                            else NSControlStateValueOff)
+            pos_menu.addItem_(entry)
+        if current == settings.CUSTOM:
+            xy = settings.get_position_xy()
+            entry = _item(f"Custom ({xy[0]:.0f}, {xy[1]:.0f})", enabled=False)
+            entry.setState_(NSControlStateValueOn)
+            pos_menu.addItem_(entry)
+
     # -- actions (main thread)
 
     def chooseLanguage_(self, sender):
@@ -206,6 +234,36 @@ class MenuBar(NSObject):
                 self.on_language(new)
         self._rebuild()
 
+    def choosePosition_(self, sender):
+        pos = sender.representedObject()
+        if self.moving:
+            self.moving = False
+            if self.on_move:
+                self.on_move(False)
+        settings.set_position(pos)
+        self._rebuild()
+        if self.on_position:
+            self.on_position(pos)
+
+    def toggleMove_(self, sender):
+        self.moving = not self.moving
+        if self.on_move:
+            self.on_move(self.moving)
+        self._rebuild()
+
+    def finish_move(self):
+        """End move mode (Enter key); safe from any thread."""
+        AppHelper.callAfter(self._finish_move)
+
+    @objc.python_method
+    def _finish_move(self):
+        if not self.moving:
+            return
+        self.moving = False
+        if self.on_move:
+            self.on_move(False)
+        self._rebuild()
+
     def assignQuickKey_(self, sender):
         info = sender.representedObject()
         settings.set_quick_key(info["slot"], info["code"])
@@ -227,6 +285,8 @@ class MenuBar(NSObject):
         AppHelper.callAfter(self.status.setTitle_, text)
 
 
-def create_menubar(status_text, language="en", on_language=None):
-    return MenuBar.alloc().initWithStatusText_language_onLanguage_(
-        status_text, language, on_language)
+def create_menubar(status_text, language="en", on_language=None,
+                   on_position=None, on_move=None):
+    return (MenuBar.alloc()
+            .initWithStatusText_language_onLanguage_onPosition_onMove_(
+                status_text, language, on_language, on_position, on_move))

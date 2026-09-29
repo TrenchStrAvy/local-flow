@@ -5,3 +5,4 @@ numpy>=1.26
 pyobjc-framework-Cocoa>=10
 pyobjc-framework-Quartz>=10
 pyobjc-framework-ApplicationServices>=10
+pyobjc-framework-SceneKit>=10
