@@ -143,16 +143,37 @@
     if (old) { old.className = 'out'; setTimeout(() => old.remove(), 400); }
     const s = document.createElement('span'); s.className = 'in'; s.textContent = name; langEl.appendChild(s);
   }
+  // The sphere listens to the sentence as if it were spoken: every syllable
+  // typed gives a quick swell, and the gap between words dips. Vowels mark
+  // syllables in alphabetic scripts; each character is one in CJK and Hangul.
+  const VOWEL = /[aeiouyàáâäãåæèéêëìíîïòóôöõøùúûüÿœ]/i;
+  const SYLLABIC = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/;
+  const ARABIC = /[\u0600-\u06ff]/;
+  const speech = { onset: 0, gap: 0, lastOnset: -1e9, arabicCount: 0 };
+  function hear(ch, now) {
+    if (/[\s,.;:!?\u3001\u3002\uff0c\u060c]/.test(ch)) { speech.gap = 1; return; }   // between words
+    let syllable = VOWEL.test(ch) || SYLLABIC.test(ch);
+    if (!syllable && ARABIC.test(ch)) syllable = (++speech.arabicCount % 2) === 0;
+    if (syllable && now - speech.lastOnset > 250) {            // at most 4 swells per sentence
+      speech.onset = 0.75 + 0.25 * Math.random(); speech.lastOnset = now;
+    }
+  }
   function typeLine(text, ms) {
     return new Promise(resolve => {
       lineEl.classList.remove('fade'); lineEl.textContent = '';
       const caret = document.createElement('span'); caret.className = 'caret';
-      const t0 = performance.now(); typing = true;
+      const t0 = performance.now(); typing = true; speech.lastOnset = -1e9;
       function step(now) {
         const p = Math.min(1, (now - t0) / ms); typeProgress = p;
         const n = Math.round(p * text.length);
+        for (const ch of text.slice(lineEl.textContent.length, n)) hear(ch, now);
         lineEl.textContent = text.slice(0, n); lineEl.appendChild(caret);
-        if (p < 1) requestAnimationFrame(step); else { typing = false; resolve(); }
+        if (p < 1) requestAnimationFrame(step);
+        else {
+          // the sentence lands: one fuller swell, held for a beat, then the ease to rest
+          speech.onset = 1.0; speech.lastOnset = now;
+          setTimeout(() => { typing = false; resolve(); }, 260);
+        }
       }
       requestAnimationFrame(step);
     });
@@ -338,22 +359,25 @@ void main() {
     let t = 0, flow = 0, level = 0.05, pulse = 0, last = performance.now(), nextPulseAt = 0;
     // after a sentence the ribbons ease back to their resting pace on a
     // critically damped spring: no overshoot, no jolt at the start or end
-    let levelV = 0;
-    const EASE_W = 3.2;                       // settles in about 1.5 s
+    let levelV = 0, syl = 0;
+    const EASE_W = 9.0;                       // at rest by the time the next language flips in (0.65 s)
     function frame(now) {
       const dt = Math.min(0.05, (now - last) / 1000); last = now; t = (t + dt) % WRAP;
       // the sphere "hears" the sentence being transcribed
-      const target = typing ? SENS[0] + 0.02 * Math.sin(t * 7) : 0.05;
+      // syllables swell, word gaps dip: a spoken rhythm, not a steady level
+      if (speech.onset > 0) { syl = Math.max(syl, speech.onset); pulse = Math.max(pulse, SENS[1] * 0.6 * speech.onset); speech.onset = 0; }
+      if (speech.gap > 0) { syl *= 0.35; speech.gap = 0; }
+      syl *= Math.exp(-dt / 0.17);        // fuller swells, now that there are fewer
+      const target = typing ? 0.05 + (SENS[0] - 0.05) * (0.3 + 0.7 * syl) : 0.05;
       if (typing) {
         // rise with the sentence
-        level += (target - level) * (1 - Math.pow(0.02, dt / 0.28)); levelV = 0;
+        // quick to swell, a little slower to fall: the bounce of each syllable
+        level += (target - level) * (1 - Math.exp(-dt / (target > level ? 0.035 : 0.09))); levelV = 0;
       } else {
         // natural slow-down: velocity and position both glide to rest
         levelV += (-EASE_W * EASE_W * (level - target) - 2 * EASE_W * levelV) * dt;
         level += levelV * dt;
       }
-      if (typing && typeProgress > nextPulseAt) { pulse = Math.max(pulse, SENS[1]); nextPulseAt = typeProgress + SENS[2]; }
-      if (!typing) nextPulseAt = 0;
       pulse *= Math.pow(0.02, dt / 1.0);
       flow = (flow + dt * (0.8 + FLOW_GAIN * level)) % WRAP;   // integrated flow phase: speed follows the voice, no jumps
       if (window.__sphereHidden) { requestAnimationFrame(frame); return; }   // evaporated: nothing to draw
