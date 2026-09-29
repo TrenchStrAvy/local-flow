@@ -9,8 +9,8 @@
 #   2. creates .venv and installs the Python dependencies
 #   3. pre-downloads the speech model(s) so the first dictation is instant
 #   4. optionally installs Ollama + gemma3:4b for the cleanup pass
-#   5. builds a named "LocalFlow" runtime app so macOS privacy settings show
-#      LocalFlow (not "Python"), puts a LocalFlow launcher in /Applications
+#   5. builds a named "Sorph" runtime app so macOS privacy settings show
+#      Sorph (not "Python"), puts a Sorph launcher in /Applications
 #      and Launchpad, and installs a LaunchAgent that starts it at login
 #
 # Flags:
@@ -35,7 +35,7 @@ model=small.en
 label=com.localflow.dictation
 support_root="$HOME/Library/Application Support/LocalFlow"
 runtime_app="$support_root/Runtime/LocalFlow.app"
-visible_app=/Applications/LocalFlow.app
+visible_app=/Applications/Sorph.app
 
 while (( $# > 0 )); do
   case $1 in
@@ -175,7 +175,9 @@ fi
 if $runtime_ok; then
   program="$runtime_app/Contents/MacOS/LocalFlow"
   site=$(.venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
-  perm_name=LocalFlow
+  # the name macOS shows in the privacy panes is the runtime's own display
+  # name: Sorph for new runtimes, LocalFlow for ones built before the rename
+  perm_name=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$runtime_app/Contents/Info.plist" 2>/dev/null || echo Sorph)
 else
   program="$root/.venv/bin/python"
   site=""
@@ -186,7 +188,7 @@ fi
 # A tiny signed Swift app: clicking it starts the service (or leaves it
 # running) and exits. Needs the Xcode Command Line Tools for swiftc.
 if command -v swiftc >/dev/null; then
-  tmp_launcher=$(mktemp -d "${TMPDIR:-/tmp}/localflow-launcher.XXXXXX")/LocalFlow.app
+  tmp_launcher=$(mktemp -d "${TMPDIR:-/tmp}/localflow-launcher.XXXXXX")/Sorph.app
   if scripts/build-launcher.sh "$tmp_launcher" >/dev/null 2>&1; then
     if [[ -d $visible_app && $(bundle_id "$visible_app") != com.localflow.launcher ]]; then
       warn "$visible_app exists but isn't the Sorph launcher; leaving it alone"
@@ -265,7 +267,7 @@ Next: grant permissions once, then restart local-flow.
     • Microphone        → allow "$perm_name"
     • Accessibility     → add and enable "$perm_name"
     • Input Monitoring  → add and enable "$perm_name"
-  Then click LocalFlow in Launchpad, or run:
+  Then click Sorph in Launchpad, or run:
     launchctl kickstart -k gui/\$(id -u)/$label
 
 Hold Right-Option, speak, release. Look for the mic icon in the menu bar.

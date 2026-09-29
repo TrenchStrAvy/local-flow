@@ -47,7 +47,7 @@ if [[ ${LOCALFLOW_TEST_MODE:-0} == 1 ]]; then
   user_id=${LOCALFLOW_UID:?}
   user_home=${LOCALFLOW_HOME:?}
 else
-  visible_app=/Applications/LocalFlow.app
+  visible_app=/Applications/Sorph.app
   account_name=$(id -un)
   user_home=$(dscl . -read "/Users/$account_name" NFSHomeDirectory |
     awk '{print $2}')
@@ -113,7 +113,7 @@ elif [[ -d $visible_app ]] &&
   source_runtime=$visible_app
   runtime_reused=false
 else
-  print -u2 "no valid LocalFlow runtime bundle was found"
+  print -u2 "no valid Sorph runtime bundle was found"
   exit 66
 fi
 
@@ -236,7 +236,7 @@ poll_service_running() {
     fi
     sleep 0.1
   done
-  print -u2 "LocalFlow did not reach a stable running state"
+  print -u2 "Sorph did not reach a stable running state"
   return 1
 }
 
@@ -302,7 +302,7 @@ installed_pid=
 
 rollback_installation() {
   local rollback_failed=false
-  print -u2 "installation failed; restoring the previous LocalFlow installation"
+  print -u2 "installation failed; restoring the previous Sorph installation"
 
   "$launchctl_bin" bootout "$target" >/dev/null 2>&1 || true
   wait_for_service_unloaded || rollback_failed=true

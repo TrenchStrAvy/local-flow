@@ -80,7 +80,7 @@ class InstallerTests(unittest.TestCase):
         self.home = self.root / "Users" / "tester"
         self.support = self.home / "Library" / "Application Support" / "LocalFlow"
         self.launch_agents = self.home / "Library" / "LaunchAgents"
-        self.visible_app = self.applications / "LocalFlow.app"
+        self.visible_app = self.applications / "Sorph.app"
         self.plist = self.launch_agents / "com.localflow.dictation.plist"
         self.state_path = self.root / "launchctl-state.json"
         self.log_path = self.root / "launchctl-calls.jsonl"
@@ -90,7 +90,7 @@ class InstallerTests(unittest.TestCase):
         runtime_fixture = (
             INSTALLED_RUNTIME
             if INSTALLED_RUNTIME.is_dir()
-            else Path("/Applications/LocalFlow.app")
+            else Path("/Applications/Sorph.app")
         )
         shutil.copytree(runtime_fixture, self.visible_app)
         if not INSTALLED_PLIST.is_file():

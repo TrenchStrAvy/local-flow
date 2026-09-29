@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if (( $# != 1 )); then
-  print -u2 "usage: $0 /absolute/path/LocalFlow.app"
+  print -u2 "usage: $0 /absolute/path/Sorph.app"
   exit 64
 fi
 

@@ -190,7 +190,7 @@ Models download on first use to `~/.cache/huggingface`.
 ```bash
 launchctl bootout gui/$(id -u)/com.localflow.dictation
 rm ~/Library/LaunchAgents/com.localflow.dictation.plist
-rm -rf /Applications/LocalFlow.app "$HOME/Library/Application Support/LocalFlow"
+rm -rf /Applications/Sorph.app "$HOME/Library/Application Support/LocalFlow"
 rm -rf Sorph   # the cloned folder
 ```
 
